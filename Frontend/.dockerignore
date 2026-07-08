@@ -1,0 +1,15 @@
+.idea/
+.next/
+node_modules/
+coverage/
+out/
+build/
+.vercel/
+
+.env
+.env.*
+!.env.example
+
+*.log
+*.tsbuildinfo
+next-env.d.ts

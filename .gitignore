@@ -1,0 +1,44 @@
+# Secrets
+.env
+.env.*
+!.env.example
+Settings.ini
+**/Settings.ini
+deploy/backup.env
+deploy/*.env
+
+# .NET
+**/bin/
+**/obj/
+**/logs/
+*.user
+*.suo
+*.lscache
+*.tmp
+.vs/
+
+# Node / Next.js
+**/node_modules/
+**/.next/
+**/out/
+**/build/
+**/.vercel/
+*.tsbuildinfo
+
+# IDE
+.idea/
+
+# Local verification/output files
+.verify-*/
+**/.verify-*/
+**/verify-bin/
+**/verify-obj/
+MaintenanceApp/.codex/
+MaintenanceApp/DatabaseMigratorTemp/
+run-*.log
+*.log
+local-mysql/
+
+# OS
+.DS_Store
+Thumbs.db
