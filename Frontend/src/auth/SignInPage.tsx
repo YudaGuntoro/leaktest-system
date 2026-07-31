@@ -33,18 +33,7 @@ export default function SignInPage() {
   }, [nextPath, router]);
 
   useEffect(() => {
-    const clearAutofill = () => {
-      setUsername("");
-      setPassword("");
-      document.querySelectorAll<HTMLInputElement>("[data-login-field]").forEach((field) => {
-        field.value = "";
-      });
-    };
-
     setFieldNonce(crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    clearAutofill();
-    const timers = [150, 600, 1200, 2400].map((delay) => window.setTimeout(clearAutofill, delay));
-    return () => timers.forEach(window.clearTimeout);
   }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
