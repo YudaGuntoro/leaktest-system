@@ -31,14 +31,16 @@ services:
       context: ./Frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
+        SERVER_API_BASE_URL: ${SERVER_API_BASE_URL:-http://api:8080}
     image: leaktest-system-web:latest
     container_name: leaktest-web
     restart: unless-stopped
     depends_on:
       - api
     environment:
-      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
+      SERVER_API_BASE_URL: ${SERVER_API_BASE_URL:-http://api:8080}
     ports:
       - "${FRONTEND_HOST_PORT:-8091}:3000"
     networks:

@@ -1,8 +1,22 @@
 import type { NextConfig } from "next";
 
+const apiProxyTarget = (
+  process.env.SERVER_API_BASE_URL ||
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  "http://localhost:5241"
+).replace(/\/+$/, "");
+
 const nextConfig: NextConfig = {
   /* config options here */
   output: "standalone",
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${apiProxyTarget}/api/:path*`,
+      },
+    ];
+  },
   async headers() {
     return [
       {

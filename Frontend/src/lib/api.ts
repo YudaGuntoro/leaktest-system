@@ -2,10 +2,8 @@ import type { ApiResponse } from "./types";
 import { clearAuthSession, getStoredToken, redirectToSignIn } from "./auth";
 import { notifyApiActivity } from "./api-activity";
 
-const fallbackBaseUrl = "http://localhost:5241";
-
 function normalizeBaseUrl(value?: string) {
-  const raw = (value || fallbackBaseUrl).split(/\s+#/)[0].trim();
+  const raw = (value ?? "").split(/\s+#/)[0].trim();
   return raw.replace(/\/+$/, "");
 }
 
