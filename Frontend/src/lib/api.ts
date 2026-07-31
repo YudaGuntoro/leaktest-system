@@ -7,8 +7,27 @@ function normalizeBaseUrl(value?: string) {
   return raw.replace(/\/+$/, "");
 }
 
+function isLocalApiUrlOnPublicPage(value: string) {
+  if (typeof window === "undefined" || !value) {
+    return false;
+  }
+
+  const pageHost = window.location.hostname;
+  if (pageHost === "localhost" || pageHost === "127.0.0.1" || pageHost === "::1") {
+    return false;
+  }
+
+  try {
+    const apiHost = new URL(value).hostname;
+    return apiHost === "localhost" || apiHost === "127.0.0.1" || apiHost === "::1";
+  } catch {
+    return false;
+  }
+}
+
 export function getApiBaseUrl() {
-  return normalizeBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL);
+  const baseUrl = normalizeBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL);
+  return isLocalApiUrlOnPublicPage(baseUrl) ? "" : baseUrl;
 }
 
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {

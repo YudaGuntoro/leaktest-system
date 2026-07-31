@@ -36,9 +36,36 @@ export class ApiError<T = unknown> extends Error {
   }
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 const DEFAULT_TIMEOUT = 30000;
 const AUTH_COOKIE_NAMES = ["token", "accessToken", "authToken"];
+
+const normalizeBaseUrl = (value?: string) => {
+  const raw = (value ?? "").split(/\s+#/)[0].trim();
+  return raw.replace(/\/+$/, "");
+};
+
+const isLocalApiUrlOnPublicPage = (value: string) => {
+  if (typeof window === "undefined" || !value) {
+    return false;
+  }
+
+  const pageHost = window.location.hostname;
+  if (pageHost === "localhost" || pageHost === "127.0.0.1" || pageHost === "::1") {
+    return false;
+  }
+
+  try {
+    const apiHost = new URL(value).hostname;
+    return apiHost === "localhost" || apiHost === "127.0.0.1" || apiHost === "::1";
+  } catch {
+    return false;
+  }
+};
+
+const getApiBaseUrl = () => {
+  const baseUrl = normalizeBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL);
+  return isLocalApiUrlOnPublicPage(baseUrl) ? "" : baseUrl;
+};
 
 const getCookie = (name: string) => {
   if (typeof document === "undefined") {
@@ -100,7 +127,7 @@ const buildUrl = (endpoint: string, params?: QueryParams) => {
     return `${endpoint}${buildQueryString(params)}`;
   }
 
-  const baseUrl = API_BASE_URL.replace(/\/$/, "");
+  const baseUrl = getApiBaseUrl();
   const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
 
   return `${baseUrl}${path}${buildQueryString(params)}`;
