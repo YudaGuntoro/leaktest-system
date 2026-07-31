@@ -20,7 +20,7 @@ Server=127.0.0.1;Port=3306;User ID=root;Password=YOUR_PASSWORD;Database=yanmarle
 Apply the schema:
 
 ```powershell
-mysql -h 127.0.0.1 -P 3306 -u root -pYOUR_PASSWORD < Backend\database\production_control_monitoring.sql
+mysql -h 127.0.0.1 -P 3306 -u root -pYOUR_PASSWORD < Backend\database\yanmarleaktest.sql
 ```
 
 ## API

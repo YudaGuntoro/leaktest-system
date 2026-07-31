@@ -38,15 +38,11 @@ LT-PIC-0001
 MySQL 8 is required. From the repository root, run:
 
 ```powershell
-mysql -u root -p -e "source Backend/database/production_control_monitoring.sql"
+mysql -u root -p -e "source Backend/database/yanmarleaktest.sql"
 ```
 
 The script creates `yanmarleaktest`, the login user, work record tables,
-and starter records. The production-only migration is also available at:
-
-```text
-Backend/Web.API.Persistence/Migrations/20260707_001_production_control_monitoring.sql
-```
+and starter records.
 
 ## Run locally
 
