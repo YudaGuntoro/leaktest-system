@@ -41,14 +41,26 @@ public sealed class MqttClientService : BackgroundService, IMqttClientService
         _messageHandler = messageHandler;
 
         var cfg = Config.Instance;
-        _brokerAddress = cfg.Read("Host", "MQTT") ?? DefaultBrokerAddress;
-        _port = cfg.ReadInt("Port", "MQTT", DefaultPort);
-        _clientId = cfg.Read("ClientId", "MQTT") ?? DefaultClientId;
-        _username = cfg.Read("Username", "MQTT");
-        _password = cfg.Read("Password", "MQTT");
-        _qos = cfg.ReadInt("Qos", "MQTT", 1);
-        _retryDelay = TimeSpan.FromSeconds(Math.Max(1, cfg.ReadInt("ReconnectDelaySeconds", "Worker", 3)));
-        _loopInterval = TimeSpan.FromSeconds(Math.Max(1, cfg.ReadInt("IntervalSeconds", "Worker", 1)));
+        _brokerAddress = ReadSetting(cfg, "MQTT", "Host", "MQTT__Host", "MQTT_HOST") ?? DefaultBrokerAddress;
+        _port = ReadIntSetting(cfg, "MQTT", "Port", DefaultPort, "MQTT__Port", "MQTT_PORT");
+        _clientId = ReadSetting(cfg, "MQTT", "ClientId", "MQTT__ClientId", "MQTT_CLIENT_ID") ?? DefaultClientId;
+        _username = ReadSetting(cfg, "MQTT", "Username", "MQTT__Username", "MQTT_USERNAME");
+        _password = ReadSetting(cfg, "MQTT", "Password", "MQTT__Password", "MQTT_PASSWORD");
+        _qos = ReadIntSetting(cfg, "MQTT", "Qos", 1, "MQTT__Qos", "MQTT_QOS");
+        _retryDelay = TimeSpan.FromSeconds(Math.Max(1, ReadIntSetting(
+            cfg,
+            "Worker",
+            "ReconnectDelaySeconds",
+            3,
+            "Worker__ReconnectDelaySeconds",
+            "WORKER_RECONNECT_DELAY_SECONDS")));
+        _loopInterval = TimeSpan.FromSeconds(Math.Max(1, ReadIntSetting(
+            cfg,
+            "Worker",
+            "IntervalSeconds",
+            1,
+            "Worker__IntervalSeconds",
+            "WORKER_INTERVAL_SECONDS")));
         _topic = ReadTopic(cfg);
 
         var factory = new MqttFactory();
@@ -297,7 +309,32 @@ public sealed class MqttClientService : BackgroundService, IMqttClientService
 
     private static string ReadTopic(Config cfg)
     {
-        return cfg.Read("Topic", "MQTT") ?? DefaultTopic;
+        return ReadSetting(cfg, "MQTT", "Topic", "MQTT__Topic", "MQTT_TOPIC") ?? DefaultTopic;
+    }
+
+    private static string? ReadSetting(Config cfg, string section, string key, params string[] environmentKeys)
+    {
+        foreach (var environmentKey in environmentKeys)
+        {
+            var value = Environment.GetEnvironmentVariable(environmentKey);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value.Trim();
+            }
+        }
+
+        return cfg.Read(key, section);
+    }
+
+    private static int ReadIntSetting(
+        Config cfg,
+        string section,
+        string key,
+        int defaultValue,
+        params string[] environmentKeys)
+    {
+        var value = ReadSetting(cfg, section, key, environmentKeys);
+        return int.TryParse(value, out var parsed) ? parsed : cfg.ReadInt(key, section, defaultValue);
     }
 
     private static MqttQualityOfServiceLevel ToQualityOfServiceLevel(int qos) =>

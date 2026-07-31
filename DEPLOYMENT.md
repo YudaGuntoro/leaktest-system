@@ -51,3 +51,45 @@ Open:
 ```text
 http://localhost:3000
 ```
+
+## Docker VPS
+
+Initial clone:
+
+```bash
+sudo mkdir -p /var/www/leaktest-system
+sudo chown -R "$USER":"$USER" /var/www/leaktest-system
+git clone https://github.com/YudaGuntoro/leaktest-system.git /var/www/leaktest-system
+cd /var/www/leaktest-system
+cp .env.example .env
+nano .env
+```
+
+Required VPS `.env` values:
+
+```env
+FRONTEND_ORIGIN=https://leaktest.your-domain.com
+FRONTEND_ORIGIN_ALT=http://127.0.0.1:8091
+NEXT_PUBLIC_API_BASE_URL=https://leaktest-api.your-domain.com
+FRONTEND_HOST_PORT=8091
+API_HOST_PORT=5274
+MYSQL_CONNECTION_STRING=Server=host.docker.internal;Port=3306;User ID=root;Password=YOUR_PASSWORD;Database=yanmarleaktest;SslMode=None;AllowPublicKeyRetrieval=True;
+JWT_SIGNING_KEY=replace-with-a-long-random-leaktester-secret
+SWAGGER_ENABLED=false
+```
+
+Deploy:
+
+```bash
+cd /var/www/leaktest-system
+git pull --ff-only origin main
+docker compose -f docker-compose.vps.yml --env-file .env up -d --build
+docker compose -f docker-compose.vps.yml --env-file .env ps
+```
+
+Deploy with MQTT worker:
+
+```bash
+docker compose -f docker-compose.vps.yml --env-file .env --profile worker up -d --build
+docker compose -f docker-compose.vps.yml --env-file .env --profile worker ps
+```

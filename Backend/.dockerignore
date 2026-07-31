@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+**/logs/
+.vs/
+Settings.ini
+**/Settings.ini
+*.user
+*.log
