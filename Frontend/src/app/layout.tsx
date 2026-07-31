@@ -7,14 +7,14 @@ import { ToastProvider } from '@/context/ToastContext';
 
 export const metadata: Metadata = {
   title: {
-    default: "Production Control Monitoring System",
-    template: "%s | Production Control Monitoring System",
+    default: "Leaktester Work Record",
+    template: "%s | Leaktester Work Record",
   },
-  description: "Production Control Monitoring System for PT YKK AP Indonesia",
+  description: "Leaktester Work Record for PT. Yanmar Diesel Indonesia",
   icons: {
-    apple: "/icon.png?v=ykk-ap",
-    icon: "/icon.png?v=ykk-ap",
-    shortcut: "/favicon.ico?v=ykk-ap",
+    apple: "/yanmar-icon.svg?v=yanmar",
+    icon: "/yanmar-icon.svg?v=yanmar",
+    shortcut: "/yanmar-icon.svg?v=yanmar",
   },
 };
 

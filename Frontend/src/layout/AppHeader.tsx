@@ -2,7 +2,8 @@
 import { ThemeToggleButton } from "@/components/common/ThemeToggleButton";
 import UserDropdown from "@/components/header/UserDropdown";
 import { useSidebar } from "@/context/SidebarContext";
-import YkkBrand from "@/components/brand/YkkBrand";
+import LeaktesterBrand from "@/components/brand/LeaktesterBrand";
+import MqttStatus from "@/components/header/MqttStatus";
 import Link from "next/link";
 import React, { useState } from "react";
 
@@ -68,7 +69,7 @@ const AppHeader: React.FC = () => {
           </button>
 
           <Link href="/" className="lg:hidden">
-            <YkkBrand compact showTitle={false} />
+            <LeaktesterBrand compact showTitle={false} />
           </Link>
 
           <button
@@ -98,7 +99,10 @@ const AppHeader: React.FC = () => {
             isApplicationMenuOpen ? "flex" : "hidden"
           } items-center justify-between w-full gap-4 px-5 py-4 lg:flex shadow-theme-md lg:justify-end lg:px-0 lg:shadow-none`}
         >
-          <div className="flex items-center gap-2 2xsm:gap-3">
+          <div className="flex flex-1 items-center justify-end gap-2 2xsm:gap-3">
+            <div className="hidden min-w-0 sm:block">
+              <MqttStatus />
+            </div>
             {/* <!-- Dark Mode Toggler --> */}
             <ThemeToggleButton />
             {/* <!-- Dark Mode Toggler --> */}

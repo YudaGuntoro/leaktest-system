@@ -46,7 +46,7 @@ const TableHeader: React.FC<TableHeaderProps> = ({
 }) => {
   return (
     <thead
-      className={`bg-[#0799c9] text-white dark:bg-[#0799c9] dark:text-white ${className ?? ""
+      className={`bg-brand-500 text-white dark:bg-brand-500 dark:text-white ${className ?? ""
         }`}
       {...props}
     >

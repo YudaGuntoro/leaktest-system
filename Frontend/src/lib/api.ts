@@ -1,5 +1,6 @@
 import type { ApiResponse } from "./types";
 import { clearAuthSession, getStoredToken, redirectToSignIn } from "./auth";
+import { notifyApiActivity } from "./api-activity";
 
 const fallbackBaseUrl = "http://localhost:5241";
 
@@ -29,6 +30,7 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
     ...init,
     headers,
   });
+  notifyApiActivity();
   const text = await response.text();
   const payload = text ? (JSON.parse(text) as ApiResponse<T>) : null;
 
@@ -44,6 +46,50 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   }
 
   return payload ? payload.data : (undefined as T);
+}
+
+export async function apiDownload(path: string, init: RequestInit = {}) {
+  const headers = new Headers(init.headers);
+  const token = getStoredToken();
+
+  if (!headers.has("Accept")) {
+    headers.set("Accept", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  }
+
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${getApiBaseUrl()}${path}`, {
+    ...init,
+    headers,
+  });
+  notifyApiActivity();
+
+  if (response.status === 401) {
+    clearAuthSession();
+    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/signin")) {
+      redirectToSignIn();
+    }
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    let message = `Request failed with status ${response.status}`;
+
+    if (text) {
+      try {
+        const payload = JSON.parse(text) as ApiResponse<unknown>;
+        message = payload.message || message;
+      } catch {
+        message = text;
+      }
+    }
+
+    throw new Error(message);
+  }
+
+  return response.blob();
 }
 
 export function apiGet<T>(path: string) {

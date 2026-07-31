@@ -14,29 +14,47 @@ export type ApiListResponse<T> = {
   pagination: ApiPagination;
 };
 
+export type UserRole = {
+  id: number;
+  role_name: string;
+  description?: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type User = {
   id: number;
-  name: string;
   username: string;
+  full_name: string;
+  email?: string | null;
+  phone?: string | null;
+  roles_id: number;
   role: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt?: string;
+  is_active: boolean;
+  last_login_at?: string | null;
+  created_at: string;
+  updated_at?: string;
 };
 
 export type UserCreatePayload = {
-  name: string;
   username: string;
+  full_name: string;
+  email?: string | null;
+  phone?: string | null;
+  roles_id: number;
   password: string;
-  role: string;
-  isActive: boolean;
+  is_active: boolean;
 };
 
 export type UserUpdatePayload = {
-  name: string;
   username: string;
-  role: string;
-  isActive: boolean;
+  full_name: string;
+  email?: string | null;
+  phone?: string | null;
+  roles_id: number;
+  password?: string;
+  is_active: boolean;
 };
 
 export type UserQuery = {
@@ -69,6 +87,16 @@ const UserService = {
       message: string;
       data: User;
     }>(`/api/users/${id}`, options);
+
+    return response.data;
+  },
+
+  getRoles: async (options?: ApiRequestOptions) => {
+    const response = await api.get<{
+      success: boolean;
+      message: string;
+      data: UserRole[];
+    }>("/api/users/roles", options);
 
     return response.data;
   },

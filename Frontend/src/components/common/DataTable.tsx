@@ -8,6 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import ClearFilterButton from "./ClearFilterButton";
 
 export type DataTableSortDirection = "asc" | "desc";
 
@@ -37,6 +38,8 @@ type SearchFieldOption = {
 
 type DataTableProps<T extends object> = {
   actions?: React.ReactNode;
+  clearFiltersDisabled?: boolean;
+  clearFiltersLabel?: string;
   columns: DataTableColumn<T>[];
   data: T[];
   emptyMessage?: string;
@@ -45,6 +48,7 @@ type DataTableProps<T extends object> = {
   limitOptions?: number[];
   minWidth?: string;
   onLimitChange?: (limit: number) => void;
+  onClearFilters?: () => void;
   onPageChange?: (page: number) => void;
   onSearchChange?: (value: string) => void;
   onSearchFieldChange?: (value: string) => void;
@@ -141,6 +145,8 @@ const getPageNumbers = (currentPage: number, totalPage: number) => {
 
 export default function DataTable<T extends object>({
   actions,
+  clearFiltersDisabled,
+  clearFiltersLabel = "Clear filter",
   columns,
   data,
   emptyMessage = "No data available",
@@ -149,6 +155,7 @@ export default function DataTable<T extends object>({
   limitOptions = [10, 25, 50, 100],
   minWidth = "720px",
   onLimitChange,
+  onClearFilters,
   onPageChange,
   onSearchChange,
   onSearchFieldChange,
@@ -203,7 +210,7 @@ export default function DataTable<T extends object>({
 
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03] mx-4 my-4">
-      {(title || actions || onSearchChange || onLimitChange) && (
+      {(title || actions || onSearchChange || onClearFilters || onLimitChange) && (
         <div className="border-b border-gray-100 px-5 py-4 dark:border-white/[0.05]">
           {title && (
             <h3 className="mb-4 text-base font-semibold text-gray-800 dark:text-white/90">
@@ -236,7 +243,7 @@ export default function DataTable<T extends object>({
               {actions}
             </div>
 
-            {(onSearchChange || searchFields) && (
+            {(onSearchChange || searchFields || onClearFilters) && (
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 {onSearchChange && (
                   <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
@@ -264,6 +271,14 @@ export default function DataTable<T extends object>({
                       </option>
                     ))}
                   </select>
+                )}
+
+                {onClearFilters && (
+                  <ClearFilterButton
+                    disabled={clearFiltersDisabled}
+                    label={clearFiltersLabel}
+                    onClick={onClearFilters}
+                  />
                 )}
               </div>
             )}

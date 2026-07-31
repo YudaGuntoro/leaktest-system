@@ -1,3 +1,5 @@
+import { notifyApiActivity } from "@/lib/api-activity";
+
 export type QueryParamValue =
   | string
   | number
@@ -50,6 +52,14 @@ const getCookie = (name: string) => {
   return cookie ? decodeURIComponent(cookie.split("=")[1]) : null;
 };
 
+const getStoredToken = () => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window.localStorage.getItem("pcms_access_token");
+};
+
 const getAuthToken = () => {
   for (const cookieName of AUTH_COOKIE_NAMES) {
     const token = getCookie(cookieName);
@@ -58,7 +68,7 @@ const getAuthToken = () => {
     }
   }
 
-  return null;
+  return getStoredToken();
 };
 
 const buildQueryString = (params?: QueryParams) => {
@@ -155,6 +165,7 @@ const request = async <T>(
       headers: createHeaders(body, fetchOptions.headers),
       signal: controller.signal,
     });
+    notifyApiActivity();
     const data = await parseResponse<T>(response);
 
     if (!response.ok) {

@@ -1,30 +1,36 @@
-# Production Control Monitoring System
+# Leaktester Work Record
 
-Basic production control system for **PT YKK AP Indonesia**, adapted from the
-Production Control domain.
+Basic leak tester work record system for **PT. Yanmar Diesel Indonesia**.
 
 ## Included modules
 
 - JWT login with the existing authentication flow
-- Production dashboard and daily achievement
+- Leak test dashboard and daily achievement
 - PIC ID card verification
 - Cutting list master data
-- Production work order control
+- Leak test work order control
+- Engine information and leak test work record table
+- Engine model master data
 - Start, output update, and complete workflow
-- Production activity log
+- Work record activity log
 - MySQL schema and demo data
+
+## Project structure
+
+- `Frontend` - JavaScript/Next.js frontend application
+- `Backend` - C#/.NET API, domain/persistence projects, database script, and backend assets
 
 ## Default demo access
 
 ```text
-Username: admin
-Password: admin123
+Username: root
+Password: root_native
 ```
 
 Demo PIC card:
 
 ```text
-YKK-PIC-0001
+LT-PIC-0001
 ```
 
 ## Database
@@ -32,14 +38,14 @@ YKK-PIC-0001
 MySQL 8 is required. From the repository root, run:
 
 ```powershell
-mysql -u root -p -e "source database/production_control_monitoring.sql"
+mysql -u root -p -e "source Backend/database/production_control_monitoring.sql"
 ```
 
-The script creates `db_production_control`, the login user, production tables,
+The script creates `yanmarleaktest`, the login user, work record tables,
 and starter records. The production-only migration is also available at:
 
 ```text
-ProductionControl/ProductionControl.Persistence/Migrations/20260707_001_production_control_monitoring.sql
+Backend/Web.API.Persistence/Migrations/20260707_001_production_control_monitoring.sql
 ```
 
 ## Run locally
@@ -47,8 +53,8 @@ ProductionControl/ProductionControl.Persistence/Migrations/20260707_001_producti
 API:
 
 ```powershell
-$env:ConnectionStrings__DefaultConnection="Server=127.0.0.1;Port=3306;User ID=root;Password=YOUR_PASSWORD;Database=db_production_control;SslMode=None;AllowPublicKeyRetrieval=True;"
-dotnet run --project ProductionControl.WebAPI\ProductionControl.WebAPI.csproj
+$env:ConnectionStrings__DefaultConnection="Server=127.0.0.1;Port=3306;User ID=root;Password=YOUR_PASSWORD;Database=yanmarleaktest;SslMode=None;AllowPublicKeyRetrieval=True;"
+dotnet run --project Backend\Web.API\Web.API.csproj
 ```
 
 Frontend, in another terminal:
@@ -66,14 +72,16 @@ Open `http://localhost:3000`.
 
 Core endpoints:
 
-- `GET /api/production/dashboard`
-- `GET|POST /api/production/work-orders`
-- `POST /api/production/work-orders/scan`
-- `POST /api/production/work-orders/{id}/scan-pic`
-- `POST /api/production/work-orders/{id}/operators/{operatorId}/remove`
-- `POST /api/production/work-orders/{id}/start`
-- `POST /api/production/work-orders/{id}/finish`
-- `POST /api/production/work-orders/{id}/cancel-finish`
-- `GET|POST /api/production/cutting-lists`
-- `GET /api/production/pic-cards`
-- `GET /api/production/activity-logs`
+- `GET /api/leaktester/dashboard`
+- `GET|POST /api/leaktester/work-records`
+- `GET|POST /api/leaktester/engine-models`
+- `GET|POST /api/leaktester/work-orders`
+- `POST /api/leaktester/work-orders/scan`
+- `POST /api/leaktester/work-orders/{id}/scan-pic`
+- `POST /api/leaktester/work-orders/{id}/operators/{operatorId}/remove`
+- `POST /api/leaktester/work-orders/{id}/start`
+- `POST /api/leaktester/work-orders/{id}/finish`
+- `POST /api/leaktester/work-orders/{id}/cancel-finish`
+- `GET|POST /api/leaktester/cutting-lists`
+- `GET /api/leaktester/pic-cards`
+- `GET /api/leaktester/activity-logs`

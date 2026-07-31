@@ -6,7 +6,7 @@ import DataTable, { DataTableColumn } from "@/components/common/DataTable";
 import { useProcessLogs } from "@/hooks/useProcessLogs";
 import { ProcessLog } from "@/services/ProcessLogService";
 import { useToast } from "@/context/ToastContext";
-import { ArrowUpIcon } from "@/icons";
+import ExportButton from "@/components/common/ExportButton";
 
 const dateFormatter = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -138,17 +138,12 @@ export default function ProcessLogTable() {
             <option value="false">Inactive</option>
           </select>
 
-          <button
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#6D8AF3] px-4 text-sm font-semibold text-white shadow-theme-xs transition-colors hover:bg-[#5f7eea] focus:outline-none focus:ring-3 focus:ring-[#6D8AF3]/25 disabled:cursor-not-allowed disabled:opacity-60"
+          <ExportButton
             disabled={isLoading}
             onClick={handleExport}
-            type="button"
           >
-            <span className="inline-flex size-4 shrink-0 items-center justify-center">
-              <ArrowUpIcon className="size-4" />
-            </span>
-            <span className="leading-5">Export</span>
-          </button>
+            Export
+          </ExportButton>
         </div>
       }
       columns={columns}

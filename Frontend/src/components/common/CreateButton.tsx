@@ -15,7 +15,7 @@ export default function CreateButton({
   return (
     <button
       className={twMerge(
-        "inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#6D8AF3] px-4 text-sm font-semibold text-white shadow-theme-xs transition-colors hover:bg-[#5f7eea] focus:outline-none focus:ring-3 focus:ring-[#6D8AF3]/25 disabled:cursor-not-allowed disabled:opacity-60",
+        "primary-button",
         className
       )}
       type={type}

@@ -39,31 +39,31 @@
   --color-white: #ffffff;
   --color-black: #101828;
 
-  --color-brand-25: #f3fcff;
-  --color-brand-50: #e8f9fe;
-  --color-brand-100: #cef2fc;
-  --color-brand-200: #9ee6f8;
-  --color-brand-300: #5fd3f1;
-  --color-brand-400: #25b9e2;
-  --color-brand-500: #0799c9;
-  --color-brand-600: #087ea4;
-  --color-brand-700: #0b6685;
-  --color-brand-800: #10546d;
-  --color-brand-900: #11465c;
-  --color-brand-950: #062e3e;
+  --color-brand-25: #fff8f8;
+  --color-brand-50: #fff1f2;
+  --color-brand-100: #ffe1e5;
+  --color-brand-200: #ffc7d0;
+  --color-brand-300: #ff99aa;
+  --color-brand-400: #ff5b73;
+  --color-brand-500: #e60028;
+  --color-brand-600: #c90021;
+  --color-brand-700: #a5001b;
+  --color-brand-800: #850019;
+  --color-brand-900: #690016;
+  --color-brand-950: #3b000b;
 
-  --color-blue-light-25: #f5fbff;
-  --color-blue-light-50: #f0f9ff;
-  --color-blue-light-100: #e0f2fe;
-  --color-blue-light-200: #b9e6fe;
-  --color-blue-light-300: #7cd4fd;
-  --color-blue-light-400: #36bffa;
-  --color-blue-light-500: #0ba5ec;
-  --color-blue-light-600: #0086c9;
-  --color-blue-light-700: #026aa2;
-  --color-blue-light-800: #065986;
-  --color-blue-light-900: #0b4a6f;
-  --color-blue-light-950: #062c41;
+  --color-blue-light-25: #fff8f8;
+  --color-blue-light-50: #fff1f2;
+  --color-blue-light-100: #ffe1e5;
+  --color-blue-light-200: #ffc7d0;
+  --color-blue-light-300: #ff99aa;
+  --color-blue-light-400: #ff5b73;
+  --color-blue-light-500: #e60028;
+  --color-blue-light-600: #c90021;
+  --color-blue-light-700: #a5001b;
+  --color-blue-light-800: #850019;
+  --color-blue-light-900: #690016;
+  --color-blue-light-950: #3b000b;
 
   --color-gray-25: #fcfcfd;
   --color-gray-50: #f9fafb;
@@ -289,7 +289,7 @@
 }
 
 @utility primary-button {
-  @apply inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 text-sm font-semibold text-white shadow-theme-xs transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60;
+  @apply inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 text-sm font-semibold text-white shadow-theme-xs transition-colors hover:bg-brand-600 focus:outline-none focus:ring-3 focus:ring-brand-500/25 disabled:cursor-not-allowed disabled:opacity-60;
 }
 
 @utility secondary-button {
@@ -502,7 +502,7 @@ span.flatpickr-weekday,
 .flatpickr-day.selected.startRange + .endRange:not(:nth-child(7n + 1)),
 .flatpickr-day.startRange.startRange + .endRange:not(:nth-child(7n + 1)),
 .flatpickr-day.endRange.startRange + .endRange:not(:nth-child(7n + 1)) {
-  box-shadow: -10px 0 0 #465fff;
+  box-shadow: -10px 0 0 #e60028;
 }
 
 .flatpickr-months .flatpickr-prev-month svg,
@@ -827,6 +827,50 @@ span.flatpickr-weekday,
   will-change: opacity, transform;
 }
 
+.auth-hero-surface {
+  isolation: isolate;
+}
+
+.auth-hero-grid {
+  z-index: 1;
+  opacity: 0.62;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(135deg, transparent 0 48%, rgba(230, 0, 40, 0.18) 48% 52%, transparent 52% 100%);
+  background-position:
+    0 0,
+    0 0,
+    0 0;
+  background-size:
+    72px 72px,
+    72px 72px,
+    360px 360px;
+  mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0.3), #000 34%, #000 100%);
+}
+
+.auth-hero-surface::before,
+.auth-hero-surface::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.auth-hero-surface::before {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 31px, rgba(255, 255, 255, 0.045) 31px 32px),
+    linear-gradient(115deg, transparent 0 38%, rgba(255, 255, 255, 0.06) 38% 38.4%, transparent 38.4% 100%);
+  opacity: 0.75;
+}
+
+.auth-hero-surface::after {
+  background:
+    linear-gradient(120deg, rgba(3, 7, 18, 0.5) 0%, transparent 42%),
+    linear-gradient(0deg, rgba(230, 0, 40, 0.2), transparent 48%);
+}
+
 @keyframes auth-moving-letter-ml3 {
   0%,
   8% {
@@ -859,9 +903,9 @@ span.flatpickr-weekday,
   }
 }
 
-/* Production Control global contrast and table header polish */
+/* Leaktester Work Record global contrast and table header polish */
 :where(table thead, table thead tr, table thead th, table thead td) {
-  background-color: #0799c9 !important;
+  background-color: #e60028 !important;
   color: #ffffff !important;
 }
 
@@ -880,6 +924,25 @@ table thead td:first-child {
 table thead th:last-child,
 table thead td:last-child {
   border-top-right-radius: 6px;
+}
+
+.leak-rounded-header-table thead,
+.leak-rounded-header-table thead tr {
+  background-color: transparent !important;
+}
+
+.leak-rounded-header-table thead th {
+  background-color: #e60028 !important;
+}
+
+.leak-rounded-header-table thead th:first-child {
+  border-bottom-left-radius: 10px;
+  border-top-left-radius: 10px;
+}
+
+.leak-rounded-header-table thead th:last-child {
+  border-bottom-right-radius: 10px;
+  border-top-right-radius: 10px;
 }
 
 .dark :is(.text-gray-400, .text-gray-500, .text-slate-400, .text-slate-500) {

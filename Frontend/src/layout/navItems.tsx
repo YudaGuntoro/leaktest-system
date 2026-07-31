@@ -2,7 +2,6 @@ import React from "react";
 import {
   BoxCubeIcon,
   BoltIcon,
-  DocsIcon,
   GridIcon,
 } from "../icons/index";
 
@@ -28,21 +27,15 @@ export const navItems: NavItem[] = [
   },
   {
     icon: <BoltIcon />,
-    name: "Production Control",
-    path: "/production-control",
+    name: "Leaktester Work Record",
+    path: "/work-record",
   },
   {
     icon: <BoxCubeIcon />,
     name: "Master Data",
     subItems: [
-      { name: "Cutting Lists", path: "/cutting-lists" },
-      { name: "Shift Master", path: "/shift-master" },
-      { name: "Operator Cards", path: "/pic-cards" },
+      { name: "Engine Model", path: "/engine-model" },
+      { name: "User", path: "/users" },
     ],
-  },
-  {
-    icon: <DocsIcon />,
-    name: "Production Activity",
-    path: "/production-history",
   },
 ];

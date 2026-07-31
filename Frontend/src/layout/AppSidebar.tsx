@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import YkkBrand from "@/components/brand/YkkBrand";
+import LeaktesterBrand from "@/components/brand/LeaktesterBrand";
 import { useSidebar } from "../context/SidebarContext";
 import {
   ChevronDownIcon,
@@ -138,9 +138,9 @@ const AppSidebar: React.FC = () => {
         <Link href="/" className="sidebar-brand-link flex items-center gap-3">
           <span className="sidebar-brand-motion flex items-center gap-4">
             {isExpanded || isHovered || isMobileOpen ? (
-              <YkkBrand compact />
+              <LeaktesterBrand compact />
             ) : (
-              <YkkBrand compact showTitle={false} />
+              <LeaktesterBrand compact showTitle={false} />
             )}
           </span>
         </Link>

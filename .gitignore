@@ -15,6 +15,7 @@ deploy/*.env
 *.suo
 *.lscache
 *.tmp
+*.bak
 .vs/
 
 # Node / Next.js
@@ -29,6 +30,7 @@ deploy/*.env
 .idea/
 
 # Local verification/output files
+.codex-runtime/
 .verify-*/
 **/.verify-*/
 **/verify-bin/

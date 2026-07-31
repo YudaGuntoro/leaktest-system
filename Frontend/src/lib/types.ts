@@ -6,7 +6,6 @@ export type ApiResponse<T> = {
 };
 
 export type UserRole = "ADMIN" | "SUPERVISOR" | "OPERATOR" | "VIEWER";
-export type UserStatus = "ACTIVE" | "INACTIVE";
 
 export type UserResponse = {
   id: number;
@@ -14,8 +13,9 @@ export type UserResponse = {
   full_name: string;
   email?: string | null;
   phone?: string | null;
+  roles_id: number;
   role: UserRole;
-  status: UserStatus;
+  is_active: boolean;
   last_login_at?: string | null;
   created_at: string;
   updated_at: string;
