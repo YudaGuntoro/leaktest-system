@@ -64,3 +64,7 @@ SOURCE Backend/Web.API.Persistence/Migrations/20260729_001_leak_test_work_record
 SOURCE Backend/Web.API.Persistence/Migrations/20260729_004_demo_leak_test_work_records.sql;
 SOURCE Backend/Web.API.Persistence/Migrations/20260729_006_decimal_pressure_values.sql;
 SOURCE Backend/Web.API.Persistence/Migrations/20260730_004_demo_current_date_leak_test_work_records.sql;
+SOURCE Backend/Web.API.Persistence/Migrations/20260807_001_operators.sql;
+SOURCE Backend/Web.API.Persistence/Migrations/20260807_002_rework_engine_records.sql;
+SOURCE Backend/Web.API.Persistence/Migrations/20260807_003_demo_dashboard_work_records.sql;
+SOURCE Backend/Web.API.Persistence/Migrations/20260807_004_demo_dashboard_monthly_volume.sql;

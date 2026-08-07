@@ -5,11 +5,12 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ClearFilterButton from "@/components/common/ClearFilterButton";
+import DatePicker from "@/components/form/date-picker";
 import { ArrowRightIcon, ChevronLeftIcon } from "@/icons";
 import { useTheme } from "@/context/ThemeContext";
 import { apiGet } from "@/lib/api";
-import type { LeakTestWorkRecord } from "./types";
-import { ProductionDatePicker, todayParam } from "./ui";
+import type { LeakTestMonthlySummary, LeakTestWorkRecord } from "./types";
+import { todayParam } from "./ui";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
   ssr: false,
@@ -17,6 +18,7 @@ const ReactApexChart = dynamic(() => import("react-apexcharts"), {
 const PRESSURE_UNIT = "MPa";
 const DEFAULT_TABLE_PAGE_SIZE = 10;
 const TABLE_PAGE_SIZE_OPTIONS = [10, 25, 50, 0];
+const datePickerInputClass = "h-10 rounded-lg border-gray-200 bg-white px-4 pr-10 text-sm font-black text-slate-900 shadow-theme-xs focus:border-brand-400 focus:ring-brand-400/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white";
 
 function MetricCard({
   accent,
@@ -55,18 +57,34 @@ function displayPressure(value: number) {
   return `${Number(value).toFixed(2)} ${PRESSURE_UNIT}`;
 }
 
-function toDateParam(date: Date) {
+function dateToParam(date: Date) {
   const offset = date.getTimezoneOffset();
   return new Date(date.getTime() - offset * 60_000).toISOString().slice(0, 10);
 }
 
-function getLastSevenDateParams(endDate: string) {
-  const end = new Date(`${endDate}T00:00:00`);
-  return Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(end);
-    date.setDate(end.getDate() - (6 - index));
-    return toDateParam(date);
-  });
+function paramToDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function getDateRangeParams(startDate: string, endDate: string) {
+  const start = paramToDate(startDate);
+  const end = paramToDate(endDate);
+  const dates: string[] = [];
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return dates;
+  }
+
+  const cursor = start <= end ? start : end;
+  const last = start <= end ? end : start;
+
+  while (cursor <= last) {
+    dates.push(dateToParam(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return dates;
 }
 
 function getVisiblePages(currentPage: number, totalPages: number) {
@@ -77,35 +95,52 @@ function getVisiblePages(currentPage: number, totalPages: number) {
 
 export default function ProductionDashboard() {
   const { theme } = useTheme();
-  const [date, setDate] = useState(todayParam());
   const today = todayParam();
+  const [dateRangeStart, setDateRangeStart] = useState(today);
+  const [dateRangeEnd, setDateRangeEnd] = useState(today);
   const [records, setRecords] = useState<LeakTestWorkRecord[]>([]);
-  const [weeklyRecords, setWeeklyRecords] = useState<Record<string, LeakTestWorkRecord[]>>({});
+  const [monthlySummary, setMonthlySummary] = useState<LeakTestMonthlySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tablePage, setTablePage] = useState(1);
   const [tablePageSize, setTablePageSize] = useState(DEFAULT_TABLE_PAGE_SIZE);
 
+  const selectedDateParams = useMemo(
+    () => getDateRangeParams(dateRangeStart, dateRangeEnd),
+    [dateRangeEnd, dateRangeStart]
+  );
+  const rangeDefaultDate = useMemo(
+    () => [paramToDate(dateRangeStart), paramToDate(dateRangeEnd)],
+    [dateRangeEnd, dateRangeStart]
+  );
+  const isDefaultDateRange = dateRangeStart === today && dateRangeEnd === today;
+  const selectedPeriodLabel = useMemo(
+    () => dateRangeStart === dateRangeEnd
+      ? displayDate(dateRangeStart)
+      : `${displayDate(dateRangeStart)} - ${displayDate(dateRangeEnd)}`,
+    [dateRangeEnd, dateRangeStart]
+  );
+  const selectedYear = useMemo(() => paramToDate(dateRangeStart).getFullYear(), [dateRangeStart]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const weekDates = getLastSevenDateParams(date);
-      const [todayRecords, weeklyResults] = await Promise.all([
-        apiGet<LeakTestWorkRecord[]>(`/api/leaktester/work-records?date=${date}`),
-        Promise.all(weekDates.map(async (item) => ({
-          date: item,
-          records: await apiGet<LeakTestWorkRecord[]>(`/api/leaktester/work-records?date=${item}`),
-        }))),
+      const params = new URLSearchParams();
+      params.set("date_from", dateRangeStart);
+      params.set("date_to", dateRangeEnd);
+      const [workRecords, monthlyItems] = await Promise.all([
+        apiGet<LeakTestWorkRecord[]>(`/api/leaktester/work-records?${params.toString()}`),
+        apiGet<LeakTestMonthlySummary[]>(`/api/leaktester/work-records/monthly-summary?year=${selectedYear}`),
       ]);
-      setRecords(todayRecords);
-      setWeeklyRecords(Object.fromEntries(weeklyResults.map((item) => [item.date, item.records])));
+      setRecords(workRecords);
+      setMonthlySummary(monthlyItems);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load the leaktester dashboard.");
     } finally {
       setLoading(false);
     }
-  }, [date]);
+  }, [dateRangeEnd, dateRangeStart, selectedYear]);
 
   useEffect(() => {
     void load();
@@ -113,7 +148,38 @@ export default function ProductionDashboard() {
 
   useEffect(() => {
     setTablePage(1);
-  }, [date]);
+  }, [dateRangeEnd, dateRangeStart]);
+
+  const applyDateRange = useCallback((selectedDates: Date[], allowSingleDate: boolean) => {
+    if (!selectedDates.length) {
+      return;
+    }
+
+    const [firstDate, secondDate] = selectedDates;
+    if (!secondDate && !allowSingleDate) {
+      return;
+    }
+
+    const startDate = !secondDate || firstDate <= secondDate ? firstDate : secondDate;
+    const endDate = !secondDate || firstDate <= secondDate ? secondDate ?? firstDate : firstDate;
+
+    setDateRangeStart(dateToParam(startDate));
+    setDateRangeEnd(dateToParam(endDate));
+  }, []);
+
+  const handleDateRangeChange = useCallback((selectedDates: Date[]) => {
+    applyDateRange(selectedDates, false);
+  }, [applyDateRange]);
+
+  const handleDateRangeClose = useCallback((selectedDates: Date[]) => {
+    applyDateRange(selectedDates, true);
+  }, [applyDateRange]);
+
+  const resetDateFilter = useCallback(() => {
+    const currentToday = todayParam();
+    setDateRangeStart(currentToday);
+    setDateRangeEnd(currentToday);
+  }, []);
 
   const judgement = useMemo(() => {
     const ok = records.filter((item) => item.result === "OK").length;
@@ -124,13 +190,12 @@ export default function ProductionDashboard() {
     return { ng, ngRate, ok, okRate, total };
   }, [records]);
   const chartData = useMemo(() => {
-    const weekDates = getLastSevenDateParams(date);
     return {
-      categories: weekDates.map(displayShortDate),
-      ngSeries: weekDates.map((item) => (weeklyRecords[item] ?? []).filter((record) => record.result === "NG").length),
-      okSeries: weekDates.map((item) => (weeklyRecords[item] ?? []).filter((record) => record.result === "OK").length),
+      categories: selectedDateParams.map(displayShortDate),
+      ngSeries: selectedDateParams.map((dateItem) => records.filter((record) => record.check_date.slice(0, 10) === dateItem && record.result === "NG").length),
+      okSeries: selectedDateParams.map((dateItem) => records.filter((record) => record.check_date.slice(0, 10) === dateItem && record.result === "OK").length),
     };
-  }, [date, weeklyRecords]);
+  }, [records, selectedDateParams]);
   const chartMaxValue = useMemo(
     () => Math.max(0, ...chartData.okSeries, ...chartData.ngSeries),
     [chartData.ngSeries, chartData.okSeries]
@@ -165,7 +230,7 @@ export default function ProductionDashboard() {
     },
     fill: { opacity: 1 },
     grid: {
-      borderColor: theme === "dark" ? "#1e293b" : "#cbd5e1",
+      borderColor: theme === "dark" ? "#2b3a52" : "#cbd5e1",
       strokeDashArray: 3,
       xaxis: {
         lines: { show: false },
@@ -207,6 +272,7 @@ export default function ProductionDashboard() {
       crosshairs: {
         stroke: {
           color: theme === "dark" ? "#334155" : "#94a3b8",
+          opacity: 0.9,
           width: 1,
         },
       },
@@ -214,10 +280,128 @@ export default function ProductionDashboard() {
       labels: {
         rotate: -20,
         style: {
-          colors: theme === "dark" ? "#cbd5e1" : "#334155",
+          colors: theme === "dark" ? "#d7e1f2" : "#334155",
           fontFamily: "Outfit, sans-serif",
         },
         trim: true,
+      },
+    },
+    yaxis: {
+      decimalsInFloat: 0,
+      labels: {
+        formatter: (value: number) => `${Math.round(value)}`,
+        style: {
+          colors: theme === "dark" ? "#d7e1f2" : "#334155",
+          fontFamily: "Outfit, sans-serif",
+        },
+      },
+      min: 0,
+      max: chartMaxValue > 0 ? chartMaxValue + Math.max(2, Math.ceil(chartMaxValue * 0.15)) : 5,
+      title: { text: undefined },
+    },
+  }), [chartData.categories, chartMaxValue, theme]);
+  const chartSeries = useMemo(() => [
+    {
+      data: chartData.okSeries.map((value) => (value > 0 ? value : null)),
+      name: "OK",
+    },
+    {
+      data: chartData.ngSeries.map((value) => (value > 0 ? value : null)),
+      name: "NG",
+    },
+  ], [chartData.ngSeries, chartData.okSeries]);
+  const monthlyResumeMaxValue = useMemo(
+    () => Math.max(0, ...monthlySummary.map((item) => item.total_engine_inspect)),
+    [monthlySummary]
+  );
+  const monthlyResumeOptions = useMemo<ApexOptions>(() => ({
+    colors: ["#12b76a", "#e60028", "#f97316"],
+    chart: {
+      fontFamily: "Outfit, sans-serif",
+      height: 310,
+      stacked: true,
+      toolbar: { show: false },
+      type: "line",
+    },
+    dataLabels: {
+      background: { enabled: false },
+      dropShadow: {
+        blur: 2,
+        color: "#020617",
+        enabled: theme === "dark",
+        left: 0,
+        opacity: 0.45,
+        top: 1,
+      },
+      enabled: true,
+      enabledOnSeries: [0, 1],
+      formatter: (value: number) => (value > 0 ? `${Math.round(value)}` : ""),
+      style: {
+        colors: ["#ffffff"],
+        fontFamily: "Outfit, sans-serif",
+        fontSize: "11px",
+        fontWeight: 800,
+      },
+    },
+    fill: { opacity: 1 },
+    grid: {
+      borderColor: theme === "dark" ? "#1e293b" : "#cbd5e1",
+      strokeDashArray: 3,
+    },
+    legend: {
+      fontFamily: "Outfit",
+      horizontalAlign: "left",
+      position: "top",
+    },
+    plotOptions: {
+      bar: {
+        borderRadius: 8,
+        borderRadiusApplication: "end",
+        borderRadiusWhenStacked: "last",
+        columnWidth: "46%",
+        dataLabels: {
+          position: "center",
+          total: {
+            enabled: true,
+            formatter: (value: string | number) => `${Math.round(Number(value) || 0)}`,
+            style: {
+              color: theme === "dark" ? "#f8fafc" : "#0f172a",
+              fontFamily: "Outfit, sans-serif",
+              fontSize: "12px",
+              fontWeight: 800,
+            },
+          },
+        },
+      },
+    },
+    markers: {
+      colors: ["#f97316"],
+      hover: {
+        size: 6,
+      },
+      size: 0,
+      strokeColors: theme === "dark" ? "#0f172a" : "#ffffff",
+      strokeWidth: 2,
+    },
+    stroke: {
+      curve: "smooth",
+      show: true,
+      width: [0, 0, 4],
+    },
+    tooltip: {
+      y: {
+        formatter: (value: number) => `${value} engine`,
+      },
+    },
+    xaxis: {
+      axisBorder: { show: false },
+      axisTicks: { show: false },
+      categories: monthlySummary.map((item) => item.month_label),
+      labels: {
+        style: {
+          colors: theme === "dark" ? "#cbd5e1" : "#334155",
+          fontFamily: "Outfit, sans-serif",
+        },
       },
     },
     yaxis: {
@@ -230,20 +414,27 @@ export default function ProductionDashboard() {
         },
       },
       min: 0,
-      max: chartMaxValue > 0 ? chartMaxValue + Math.max(2, Math.ceil(chartMaxValue * 0.15)) : 5,
+      max: monthlyResumeMaxValue > 0 ? monthlyResumeMaxValue + Math.max(2, Math.ceil(monthlyResumeMaxValue * 0.15)) : 5,
       title: { text: undefined },
     },
-  }), [chartData.categories, chartMaxValue, theme]);
-  const chartSeries = useMemo(() => [
+  }), [monthlyResumeMaxValue, monthlySummary, theme]);
+  const monthlyResumeSeries = useMemo(() => [
     {
-      data: chartData.okSeries,
+      data: monthlySummary.map((item) => item.ok),
       name: "OK",
+      type: "column",
     },
     {
-      data: chartData.ngSeries,
+      data: monthlySummary.map((item) => item.ng),
       name: "NG",
+      type: "column",
     },
-  ], [chartData.ngSeries, chartData.okSeries]);
+    {
+      data: monthlySummary.map((item) => item.total_engine_inspect),
+      name: "Total Trend",
+      type: "line",
+    },
+  ], [monthlySummary]);
   const topNgData = useMemo(() => {
     const grouped = records.reduce<Record<string, number>>((current, record) => {
       if (record.result !== "NG") return current;
@@ -257,7 +448,7 @@ export default function ProductionDashboard() {
       .slice(0, 5);
 
     return {
-      categories: items.length ? items.map((item) => item.model) : ["No NG Today"],
+      categories: items.length ? items.map((item) => item.model) : ["No NG"],
       items,
       series: items.length ? items.map((item) => item.total) : [0],
     };
@@ -354,14 +545,28 @@ export default function ProductionDashboard() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700 dark:text-brand-300">PT. Yanmar Diesel Indonesia</p>
             <h1 className="mt-2 text-2xl font-semibold text-slate-950 dark:text-white sm:text-[28px]">Leaktester Work Record</h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">Monitor leak test judgement, OK/NG totals, and inspection records by date.</p>
+            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">Monitor leak test judgement, OK/NG totals, and inspection records by selected period.</p>
           </div>
           <div className="flex items-end gap-2">
-            <ProductionDatePicker className="w-[220px] max-w-full" label="Record Date" onChange={setDate} value={date} />
+            <div className="w-[260px] max-w-full">
+              <DatePicker
+                className={datePickerInputClass}
+                dateFormat="d / m / Y"
+                defaultDate={rangeDefaultDate}
+                id="dashboard-filter-date-range"
+                key={`dashboard-filter-date-range-${dateRangeStart}-${dateRangeEnd}`}
+                label="Filter Date"
+                mode="range"
+                onClose={handleDateRangeClose}
+                onChange={handleDateRangeChange}
+                placeholder="Select date or range"
+                staticCalendar
+              />
+            </div>
             <ClearFilterButton
-              disabled={date === today}
+              disabled={isDefaultDateRange}
               label="Reset date filter"
-              onClick={() => setDate(todayParam())}
+              onClick={resetDateFilter}
             />
           </div>
         </div>
@@ -372,42 +577,61 @@ export default function ProductionDashboard() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard
           accent="bg-brand-500"
-          label="Total Work Today"
-          note="Total judgement records today"
+          label="Total Work"
+          note={`Total judgement records, ${selectedPeriodLabel}`}
           value={loading ? "..." : judgement.total}
         />
         <MetricCard
           accent="bg-emerald-500"
-          label="OK Total Today"
+          label="OK Total"
           note="Accepted judgement records"
           value={loading ? "..." : judgement.ok}
         />
         <MetricCard
           accent="bg-rose-500"
-          label="NG Total Today"
+          label="NG Total"
           note="Rejected judgement records"
           value={loading ? "..." : judgement.ng}
         />
         <MetricCard
           accent="bg-amber-400"
           label="OK Rate"
-          note="OK percentage today"
+          note="OK percentage for selected period"
           value={loading ? "..." : `${judgement.okRate.toFixed(1)}%`}
         />
         <MetricCard
           accent="bg-slate-500"
           label="NG Rate"
-          note="NG percentage today"
+          note="NG percentage for selected period"
           value={loading ? "..." : `${judgement.ngRate.toFixed(1)}%`}
         />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white px-5 pt-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:px-6 sm:pt-6">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Monthly Inspection Resume</h2>
+          <p className="mt-1 text-xs text-slate-400">
+            Total engine inspect, OK, and NG per month for Jan {selectedYear} - Dec {selectedYear}. Duplicate barcode in the same month is counted once.
+          </p>
+        </div>
+        <div className="mt-4 max-w-full overflow-x-auto custom-scrollbar">
+          <div className="min-w-[920px]">
+            <ReactApexChart
+              height={310}
+              options={monthlyResumeOptions}
+              series={monthlyResumeSeries}
+              type="bar"
+            />
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-6">
         <section className="overflow-hidden rounded-lg border border-slate-200 bg-white px-5 pt-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:px-6 sm:pt-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">Leak Test Judgement Chart</h2>
-              <p className="mt-1 text-xs text-slate-400">OK/NG bar chart for the last 7 days ending on the selected record date.</p>
+              <p className="mt-1 text-xs text-slate-400">OK/NG bar chart for {selectedPeriodLabel}.</p>
             </div>
             <Link className="text-sm font-bold text-brand-600 hover:text-brand-700" href="/work-record">Work record -&gt;</Link>
           </div>
@@ -425,8 +649,8 @@ export default function ProductionDashboard() {
 
         <section className="overflow-hidden rounded-lg border border-slate-200 bg-white px-5 pt-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:px-6 sm:pt-6">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Top 5 Model NG Today</h2>
-            <p className="mt-1 text-xs text-slate-400">Models with the highest NG judgement count on the selected date.</p>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Top 5 Model NG</h2>
+            <p className="mt-1 text-xs text-slate-400">Models with the highest NG judgement count for {selectedPeriodLabel}.</p>
           </div>
           <div className="mt-4 max-w-full overflow-x-auto custom-scrollbar">
             <div className="min-w-[420px]">
@@ -449,7 +673,7 @@ export default function ProductionDashboard() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm font-semibold text-slate-400">No NG records today.</p>
+              <p className="text-sm font-semibold text-slate-400">No NG records for selected period.</p>
             )}
           </div>
         </section>
@@ -458,19 +682,18 @@ export default function ProductionDashboard() {
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
           <div>
-            <h2 className="font-bold text-slate-900 dark:text-white">Leak Test Judgement Today</h2>
-            <p className="mt-1 text-xs text-slate-400">OK/NG work records for the selected date.</p>
+            <h2 className="font-bold text-slate-900 dark:text-white">Leak Test Judgement</h2>
+            <p className="mt-1 text-xs text-slate-400">OK/NG work records for {selectedPeriodLabel}.</p>
           </div>
           <Link className="text-sm font-bold text-brand-600 hover:text-brand-700" href="/work-record">Work record -&gt;</Link>
         </div>
         <div className="overflow-x-auto px-3 pb-3">
-          <table className="leak-rounded-header-table w-full min-w-[920px] border-separate border-spacing-0 text-left text-sm">
+          <table className="leak-rounded-header-table w-full min-w-[820px] border-separate border-spacing-0 text-left text-sm">
             <thead className="bg-transparent text-[11px] uppercase tracking-wider text-white">
               <tr className="bg-transparent">
                 <th className="rounded-l-lg bg-brand-500 px-5 py-3">Engine Model</th>
                 <th className="bg-brand-500 px-4 py-3">Engine Number</th>
                 <th className="bg-brand-500 px-4 py-3">Date / Time</th>
-                <th className="bg-brand-500 px-4 py-3">Machine</th>
                 <th className="bg-brand-500 px-4 py-3">Pressure Input</th>
                 <th className="rounded-r-lg bg-brand-500 px-5 py-3">Judgement</th>
               </tr>
@@ -481,7 +704,6 @@ export default function ProductionDashboard() {
                   <td className="px-5 py-4 font-bold text-slate-900 dark:text-white">{record.engine_model}</td>
                   <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{record.engine_number}</td>
                   <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{displayDate(record.check_date)} / {displayTime(record.check_time)}</td>
-                  <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{record.machine_name}</td>
                   <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{displayPressure(record.pressure_input)}</td>
                   <td className="px-5 py-4">
                     <span className={`rounded-full px-3 py-1 text-xs font-black ${record.result === "OK" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300" : "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300"}`}>
@@ -492,7 +714,7 @@ export default function ProductionDashboard() {
               ))}
             </tbody>
           </table>
-          {!loading && !records.length ? <p className="px-5 py-12 text-center text-sm text-slate-400">No work records for this date.</p> : null}
+          {!loading && !records.length ? <p className="px-5 py-12 text-center text-sm text-slate-400">No work records for selected period.</p> : null}
         </div>
         {records.length ? (
           <div className="flex flex-col gap-3 border-t border-slate-100 px-5 py-4 text-sm dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">

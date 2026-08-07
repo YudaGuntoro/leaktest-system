@@ -19,6 +19,7 @@ IF ERRORLEVEL 1 (
     exit /b 1
 )
 
+
 IF EXIST "%PROJECT_FILE%" (
     echo Source project detected. Publishing Release output...
     dotnet publish "%PROJECT_FILE%" -c Release -o "%PUBLISH_DIR%"

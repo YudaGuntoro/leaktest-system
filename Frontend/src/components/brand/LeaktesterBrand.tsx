@@ -14,20 +14,15 @@ export default function LeaktesterBrand({
   showTitle = true,
 }: LeaktesterBrandProps) {
   const isLarge = size === "large" && !compact;
-  const markSize = compact ? "size-12" : isLarge ? "size-24" : "size-16";
+  const markSize = compact ? "h-10 w-16" : isLarge ? "h-24 w-36" : "h-16 w-24";
   const gapSize = isLarge ? "gap-5" : "gap-3";
   const titleSize = compact ? "text-sm" : isLarge ? "text-xl" : "text-base";
   const subtitleSize = isLarge ? "text-sm" : "text-xs";
 
   return (
     <div className={`flex items-center ${gapSize}`}>
-      <div
-        className={`flex shrink-0 items-center justify-center rounded-2xl bg-white ${
-          inverted ? "ring-1 ring-white/30" : "ring-1 ring-slate-200"
-        } ${markSize}`}
-        aria-label="Yanmar"
-      >
-        <YanmarMark className="h-[70%] w-[82%] text-brand-500" />
+      <div className={`flex shrink-0 items-center justify-center ${markSize}`}>
+        <YanmarMark className="h-full w-full object-contain" />
       </div>
       {showTitle ? (
         <div className="min-w-0">

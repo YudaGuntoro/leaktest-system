@@ -11,6 +11,7 @@ type PropsType = {
   id: string;
   mode?: "single" | "multiple" | "range" | "time";
   onChange?: Hook | Hook[];
+  onClose?: Hook | Hook[];
   defaultDate?: DateOption | DateOption[];
   label?: string;
   placeholder?: string;
@@ -29,6 +30,7 @@ export default function DatePicker({
   id,
   mode,
   onChange,
+  onClose,
   label,
   defaultDate,
   placeholder,
@@ -57,6 +59,7 @@ export default function DatePicker({
       dateFormat: resolvedDateFormat,
       defaultDate,
       onChange,
+      onClose,
       enableTime,
       time_24hr: true,
       allowInput: true,
@@ -71,7 +74,7 @@ export default function DatePicker({
     return () => {
       flatPickr.destroy();
     };
-  }, [mode, onChange, id, defaultDate, resolvedDateFormat, enableTime, altInput, altFormat, staticCalendar]);
+  }, [mode, onChange, onClose, id, defaultDate, resolvedDateFormat, enableTime, altInput, altFormat, staticCalendar]);
 
   return (
     <div>

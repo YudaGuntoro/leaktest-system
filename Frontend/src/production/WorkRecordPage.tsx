@@ -7,13 +7,15 @@ import ExportButton from "@/components/common/ExportButton";
 import { Modal } from "@/components/ui/modal";
 import { ArrowRightIcon, ChevronLeftIcon } from "@/icons";
 import { apiDownload, apiGet } from "@/lib/api";
-import type { LeakTestWorkRecord } from "./types";
+import type { EngineModel, LeakTestResult, LeakTestWorkRecord } from "./types";
 import { todayParam } from "./ui";
 
 const PRESSURE_UNIT = "MPa";
 const DEFAULT_TABLE_PAGE_SIZE = 10;
 const TABLE_PAGE_SIZE_OPTIONS = [10, 25, 50, 0];
 const datePickerInputClass = "h-10 rounded-lg border-gray-200 bg-white px-4 pr-10 text-sm font-black text-slate-900 shadow-theme-xs focus:border-brand-400 focus:ring-brand-400/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white";
+const filterInputClass = "mt-2 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900 shadow-theme-xs outline-none transition placeholder:text-slate-400 focus:border-brand-400 focus:ring-3 focus:ring-brand-400/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500";
+const filterSelectClass = `${filterInputClass} pr-9`;
 
 function displayDate(value: string) {
   return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
@@ -138,8 +140,12 @@ function DetailItem({
 
 export default function WorkRecordPage() {
   const [records, setRecords] = useState<LeakTestWorkRecord[]>([]);
+  const [engineModels, setEngineModels] = useState<EngineModel[]>([]);
   const [dateRangeStart, setDateRangeStart] = useState(todayParam());
   const [dateRangeEnd, setDateRangeEnd] = useState(todayParam());
+  const [engineModelFilter, setEngineModelFilter] = useState("");
+  const [barcodeScanFilter, setBarcodeScanFilter] = useState("");
+  const [resultFilter, setResultFilter] = useState<"" | LeakTestResult>("");
   const [selectedRecord, setSelectedRecord] = useState<LeakTestWorkRecord | null>(null);
   const [exportingRecordId, setExportingRecordId] = useState<number | null>(null);
   const [exportingList, setExportingList] = useState(false);
@@ -172,18 +178,60 @@ export default function WorkRecordPage() {
     resetTableView();
   }, [resetTableView]);
 
+  const clearRecordFilters = useCallback(() => {
+    setEngineModelFilter("");
+    setBarcodeScanFilter("");
+    setResultFilter("");
+    resetTableView();
+  }, [resetTableView]);
+
   const filterQuery = useMemo(() => {
-    if (!dateRangeStart || !dateRangeEnd) {
-      return "";
+    const params = new URLSearchParams();
+
+    if (dateRangeStart && dateRangeEnd) {
+      params.set("date_from", dateRangeStart);
+      params.set("date_to", dateRangeEnd);
     }
 
-    return `date_from=${dateRangeStart}&date_to=${dateRangeEnd}`;
-  }, [dateRangeEnd, dateRangeStart]);
+    if (engineModelFilter) {
+      params.set("engine_model", engineModelFilter);
+    }
+
+    if (resultFilter) {
+      params.set("result", resultFilter);
+    }
+
+    const barcodeScanTerm = barcodeScanFilter.trim();
+    if (barcodeScanTerm) {
+      params.set("barcode_scan", barcodeScanTerm);
+    }
+
+    return params.toString();
+  }, [barcodeScanFilter, dateRangeEnd, dateRangeStart, engineModelFilter, resultFilter]);
 
   const hasDateFilter = Boolean(dateRangeStart && dateRangeEnd);
+  const hasRecordFilters = Boolean(engineModelFilter || barcodeScanFilter.trim() || resultFilter);
   const rangeDefaultDate = useMemo(() => (
     hasDateFilter ? [paramToDate(dateRangeStart), paramToDate(dateRangeEnd)] : undefined
   ), [dateRangeEnd, dateRangeStart, hasDateFilter]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    void apiGet<EngineModel[]>("/api/leaktester/engine-models?status=active")
+      .then((items) => {
+        if (ignore) return;
+        setEngineModels(items);
+      })
+      .catch(() => {
+        if (ignore) return;
+        setEngineModels([]);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -288,38 +336,87 @@ export default function WorkRecordPage() {
       ) : null}
 
       <section className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-500 dark:text-slate-400">
-            <span>Show</span>
-            <select
-              className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-sm font-bold text-slate-700 outline-none transition focus:border-brand-500 focus:ring-3 focus:ring-brand-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
-              onChange={(event) => {
-                setTablePageSize(Number(event.target.value));
-                setTablePage(1);
-              }}
-              value={tablePageSize}
-            >
-              {TABLE_PAGE_SIZE_OPTIONS.map((size) => (
-                <option key={size} value={size}>{size === 0 ? "All" : size}</option>
-              ))}
-            </select>
-            <span>entries</span>
-          </label>
-          <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
-            Showing <span className="font-bold text-slate-800 dark:text-slate-100">{firstTableRecord}-{lastTableRecord}</span> of{" "}
-            <span className="font-bold text-slate-800 dark:text-slate-100">{records.length}</span>
-          </span>
+        <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <label className="flex items-center gap-2 text-sm font-medium text-slate-500 dark:text-slate-400">
+              <span>Show</span>
+              <select
+                className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-sm font-bold text-slate-700 outline-none transition focus:border-brand-500 focus:ring-3 focus:ring-brand-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                onChange={(event) => {
+                  setTablePageSize(Number(event.target.value));
+                  setTablePage(1);
+                }}
+                value={tablePageSize}
+              >
+                {TABLE_PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>{size === 0 ? "All" : size}</option>
+                ))}
+              </select>
+              <span>entries</span>
+            </label>
+            <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
+              Showing <span className="font-bold text-slate-800 dark:text-slate-100">{firstTableRecord}-{lastTableRecord}</span> of{" "}
+              <span className="font-bold text-slate-800 dark:text-slate-100">{records.length}</span>
+            </span>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,240px)_minmax(0,300px)_minmax(0,140px)_auto] sm:items-end">
+            <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
+              Engine Model
+              <select
+                className={filterSelectClass}
+                onChange={(event) => {
+                  setEngineModelFilter(event.target.value);
+                  resetTableView();
+                }}
+                value={engineModelFilter}
+              >
+                <option value="">All Engine Models</option>
+                {engineModels.map((item) => (
+                  <option key={item.id} value={item.engine_model}>{item.engine_model}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
+              Barcode Scan
+              <input
+                className={filterInputClass}
+                onChange={(event) => {
+                  setBarcodeScanFilter(event.target.value);
+                  resetTableView();
+                }}
+                placeholder="Scan barcode"
+                value={barcodeScanFilter}
+              />
+            </label>
+            <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
+              Result
+              <select
+                className={filterSelectClass}
+                onChange={(event) => {
+                  setResultFilter(event.target.value as "" | LeakTestResult);
+                  resetTableView();
+                }}
+                value={resultFilter}
+              >
+                <option value="">All Results</option>
+                <option value="OK">OK</option>
+                <option value="NG">NG</option>
+              </select>
+            </label>
+            <ClearFilterButton disabled={!hasRecordFilters} label="Clear work record filters" onClick={clearRecordFilters} />
+          </div>
         </div>
 
         <div className="overflow-x-auto px-3 pb-3 pt-3">
-          <table className="leak-rounded-header-table w-full min-w-[1120px] border-separate border-spacing-0 text-left text-sm">
+          <table className="leak-rounded-header-table w-full min-w-[980px] border-separate border-spacing-0 text-left text-sm">
             <thead className="bg-transparent text-xs uppercase text-white">
               <tr className="bg-transparent">
                 <th className="rounded-l-lg bg-brand-500 px-5 py-3">Engine Model</th>
                 <th className="bg-brand-500 px-4 py-3">Engine Number</th>
+                <th className="bg-brand-500 px-4 py-3">Operator</th>
                 <th className="bg-brand-500 px-4 py-3">Date</th>
                 <th className="bg-brand-500 px-4 py-3">Time</th>
-                <th className="bg-brand-500 px-4 py-3">Machine Name</th>
                 <th className="bg-brand-500 px-4 py-3">Parameter Pressure</th>
                 <th className="bg-brand-500 px-4 py-3">Pressure Input</th>
                 <th className="bg-brand-500 px-4 py-3">Cycle Time</th>
@@ -344,9 +441,9 @@ export default function WorkRecordPage() {
                 >
                   <td className="px-5 py-4 font-bold text-slate-900 dark:text-white">{record.engine_model}</td>
                   <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{record.engine_number}</td>
+                  <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{record.operator_name || "-"}</td>
                   <td className="px-4 py-4 font-semibold text-slate-600 dark:text-slate-300">{displayDate(record.check_date)}</td>
                   <td className="px-4 py-4 font-semibold text-slate-600 dark:text-slate-300">{displayTime(record.check_time)}</td>
-                  <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{record.machine_name}</td>
                   <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{displayPressure(record.parameter_pressure)}</td>
                   <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{displayPressure(record.pressure_input)}</td>
                   <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{record.cycle_time_leak_test_minutes} menit</td>
@@ -359,7 +456,7 @@ export default function WorkRecordPage() {
               ))}
             </tbody>
           </table>
-          {!records.length ? <p className="px-5 py-12 text-center text-sm text-slate-400 dark:text-slate-200">No work records for this date.</p> : null}
+          {!records.length ? <p className="px-5 py-12 text-center text-sm text-slate-400 dark:text-slate-200">No work records match the selected filters.</p> : null}
         </div>
 
         <div className="flex flex-col gap-3 border-t border-slate-100 px-5 py-4 text-sm dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
@@ -422,6 +519,7 @@ export default function WorkRecordPage() {
               <DetailItem label="Date" value={displayDate(selectedRecord.check_date)} />
               <DetailItem label="Time" value={displayTime(selectedRecord.check_time)} />
               <DetailItem label="Machine Name" value={selectedRecord.machine_name} />
+              <DetailItem label="Operator" value={selectedRecord.operator_name || "-"} />
               <DetailItem label="Parameter Pressure" value={displayPressure(selectedRecord.parameter_pressure)} />
               <DetailItem label="Pressure Input" value={displayPressure(selectedRecord.pressure_input)} />
               <DetailItem label="Cycle Time" value={`${selectedRecord.cycle_time_leak_test_minutes} menit`} />

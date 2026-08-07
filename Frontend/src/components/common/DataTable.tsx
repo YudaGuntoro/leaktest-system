@@ -50,6 +50,7 @@ type DataTableProps<T extends object> = {
   onLimitChange?: (limit: number) => void;
   onClearFilters?: () => void;
   onPageChange?: (page: number) => void;
+  onRowClick?: (row: T) => void;
   onSearchChange?: (value: string) => void;
   onSearchFieldChange?: (value: string) => void;
   onSortChange?: (key: string, direction: DataTableSortDirection) => void;
@@ -157,6 +158,7 @@ export default function DataTable<T extends object>({
   onLimitChange,
   onClearFilters,
   onPageChange,
+  onRowClick,
   onSearchChange,
   onSearchFieldChange,
   onSortChange,
@@ -218,8 +220,8 @@ export default function DataTable<T extends object>({
             </h3>
           )}
 
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-wrap items-end gap-3">
               {onLimitChange && (
                 <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                   Show
@@ -244,7 +246,7 @@ export default function DataTable<T extends object>({
             </div>
 
             {(onSearchChange || searchFields || onClearFilters) && (
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                 {onSearchChange && (
                   <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                     Search
@@ -363,7 +365,11 @@ export default function DataTable<T extends object>({
               {!isLoading &&
                 !error &&
                 data.map((row, index) => (
-                  <TableRow key={getRowKey(row, index, rowKey)}>
+                  <TableRow
+                    className={onRowClick ? "cursor-pointer transition hover:bg-gray-50 dark:hover:bg-white/[0.03]" : undefined}
+                    key={getRowKey(row, index, rowKey)}
+                    onClick={() => onRowClick?.(row)}
+                  >
                     {columns.map((column) => {
                       const value = getColumnValue(row, column);
 
