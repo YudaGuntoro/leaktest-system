@@ -363,7 +363,7 @@ export default function ProductionDashboard() {
           position: "center",
           total: {
             enabled: true,
-            formatter: (value: string | number) => `${Math.round(Number(value) || 0)}`,
+            formatter: (value?: string) => `${Math.round(Number(value) || 0)}`,
             style: {
               color: theme === "dark" ? "#f8fafc" : "#0f172a",
               fontFamily: "Outfit, sans-serif",
