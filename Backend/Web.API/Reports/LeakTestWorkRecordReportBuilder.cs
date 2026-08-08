@@ -97,10 +97,16 @@ public static class LeakTestWorkRecordReportBuilder
 
     public static string ResolveLogoPath(string templateDirectory)
     {
+        var bundledLogoPath = Path.Combine(templateDirectory, LogoFileName);
+        if (File.Exists(bundledLogoPath))
+        {
+            return bundledLogoPath;
+        }
+
         var frontendLogoPath = Path.GetFullPath(Path.Combine(templateDirectory, "..", "..", "..", FrontendLogoRelativePath));
         return File.Exists(frontendLogoPath)
             ? frontendLogoPath
-            : Path.Combine(templateDirectory, LogoFileName);
+            : bundledLogoPath;
     }
 
     private static void ApplyTemplatePolish(IXLWorksheet worksheet)
