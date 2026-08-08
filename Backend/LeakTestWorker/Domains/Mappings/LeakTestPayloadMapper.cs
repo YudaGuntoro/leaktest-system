@@ -19,9 +19,17 @@ public static class LeakTestPayloadMapper
         "engine_number",
         "engineNumber",
         "EngineNumber",
+        "serial_no",
+        "serial no",
+        "barcode",
+        "Barcode",
+        "channel_no",
+        "press_set_up",
+        "press_set_low",
         "pressure_input",
         "pressureInput",
         "PressureInput",
+        "judgement",
         "result",
         "Result"
     ];
@@ -41,7 +49,7 @@ public static class LeakTestPayloadMapper
             Data = SelectDataObject(root)
         };
 
-        var timestamp = ReadDateTime(message.Data, "timestamp", "Timestamp", "created_at", "CreatedAt", "date_time", "DateTime", "test_datetime", "TestDateTime");
+        var timestamp = ReadDateTime(message.Data, "tested_at", "testedAt", "TestedAt", "timestamp", "Timestamp", "created_at", "CreatedAt", "date_time", "DateTime", "test_datetime", "TestDateTime");
         var checkDate = ReadDate(message.Data, "check_date", "checkDate", "CheckDate", "date", "Date", "test_date", "TestDate")
             ?? timestamp?.Date
             ?? DateTime.Today;
@@ -51,16 +59,26 @@ public static class LeakTestPayloadMapper
             checkTime = (timestamp ?? DateTime.Now).ToString("HH:mm:ss", CultureInfo.InvariantCulture);
         }
 
+        var pressSetUp = ReadDecimal(message.Data, "press_set_up", "pressSetUp", "PressSetUp", "upper_press_limit", "UpperPressLimit", "tp_ul", "TP_UL");
+        var pressSetLow = ReadDecimal(message.Data, "press_set_low", "pressSetLow", "PressSetLow", "lower_press_limit", "LowerPressLimit", "tp_ll", "TP_LL");
+        var parameterPressure = ReadDecimal(message.Data, "parameter_pressure", "parameterPressure", "ParameterPressure", "set_pressure", "SetPressure", "target_pressure", "TargetPressure", "pressure_setting", "PressureSetting")
+            ?? CalculateParameterPressure(pressSetLow, pressSetUp);
+
         var record = new LeakTestHistoryRecord
         {
             EngineModelId = ReadInt(message.Data, "engine_model_id", "engineModelId", "EngineModelId", "model_id", "ModelId"),
             EngineModel = ReadString(message.Data, "engine_model", "engineModel", "EngineModel", "model", "Model", "engine_type", "EngineType"),
-            EngineNumber = ReadString(message.Data, "engine_number", "engineNumber", "EngineNumber", "engine_no", "EngineNo", "serial_number", "SerialNumber", "barcode", "Barcode") ?? string.Empty,
+            EngineNumber = ReadString(message.Data, "engine_number", "engineNumber", "EngineNumber", "engine_no", "EngineNo", "serial_no", "serial no", "serial_number", "SerialNumber", "barcode", "Barcode") ?? string.Empty,
+            BarcodeScan = ReadString(message.Data, "barcode", "Barcode", "barcode_scan", "barcodeScan", "BarcodeScan"),
             CheckDate = checkDate.Date,
             CheckTime = NormalizeTime(checkTime),
             MachineName = ReadString(message.Data, "machine_name", "machineName", "MachineName", "machine", "Machine", "line", "Line", "LineNo")
                 ?? SignalHelper.TopicToMachineName(message.Topic),
-            ParameterPressure = ReadDecimal(message.Data, "parameter_pressure", "parameterPressure", "ParameterPressure", "set_pressure", "SetPressure", "target_pressure", "TargetPressure") ?? 0,
+            Operator = ReadString(message.Data, "operator", "Operator", "operator_name", "operatorName", "OperatorName", "operator_code", "operatorCode", "OperatorCode"),
+            ChannelNo = ReadString(message.Data, "channel_no", "channelNo", "ChannelNo", "channel", "Channel"),
+            ParameterPressure = parameterPressure ?? 0,
+            PressSetUp = pressSetUp,
+            PressSetLow = pressSetLow,
             PressureInput = ReadDecimal(message.Data, "pressure_input", "pressureInput", "PressureInput", "actual_pressure", "ActualPressure", "leak_pressure", "LeakPressure") ?? 0,
             CycleTimeLeakTestMinutes = ReadDecimal(message.Data, "cycle_time_leak_test_minutes", "cycleTimeLeakTestMinutes", "CycleTimeLeakTestMinutes", "cycle_time", "cycleTime", "CycleTime", "test_minutes", "TestMinutes") ?? 0,
             Result = NormalizeResult(ReadString(message.Data, "result", "Result", "judgement", "Judgement", "status", "Status")) ?? string.Empty
@@ -221,6 +239,26 @@ public static class LeakTestPayloadMapper
             "NG" or "NOK" or "FAIL" or "FAILED" or "FALSE" or "0" => "NG",
             _ => null
         };
+    }
+
+    private static decimal? CalculateParameterPressure(decimal? pressSetLow, decimal? pressSetUp)
+    {
+        if (pressSetLow.HasValue && pressSetUp.HasValue)
+        {
+            return Math.Round((NormalizeCosmoPressure(pressSetLow.Value) + NormalizeCosmoPressure(pressSetUp.Value)) / 2, 2);
+        }
+
+        if (pressSetLow.HasValue)
+        {
+            return NormalizeCosmoPressure(pressSetLow.Value);
+        }
+
+        return pressSetUp.HasValue ? NormalizeCosmoPressure(pressSetUp.Value) : null;
+    }
+
+    private static decimal NormalizeCosmoPressure(decimal value)
+    {
+        return Math.Abs(value) >= 10 ? Math.Round(value / 100, 2) : value;
     }
 
     private static void Validate(LeakTestHistoryRecord record)

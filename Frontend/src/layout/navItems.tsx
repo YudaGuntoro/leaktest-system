@@ -67,6 +67,7 @@ export const navItems: NavItem[] = [
     name: "Master Data",
     subItems: [
       { name: "Engine Model", path: "/engine-model" },
+      { name: "Parameter", path: "/parameters" },
       { name: "Operator", path: "/operators" },
       { name: "User", path: "/users" },
     ],

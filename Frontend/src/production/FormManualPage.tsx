@@ -28,6 +28,10 @@ function displayPressure(value: number) {
   return `${Number(value).toFixed(2)} MPa`;
 }
 
+function displayOptional(value?: string | null) {
+  return value && value.trim() ? value : "-";
+}
+
 function currentTimeValue() {
   const date = new Date();
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
@@ -50,7 +54,6 @@ export default function FormManualPage({ publicAccess = false }: FormManualPageP
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportingRecordId, setExportingRecordId] = useState<number | null>(null);
-  const [copiedLink, setCopiedLink] = useState(false);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<ReworkEngineRecord | null>(null);
   const [page, setPage] = useState(1);
@@ -109,7 +112,9 @@ export default function FormManualPage({ publicAccess = false }: FormManualPageP
     { key: "operator_name", header: "Operator", render: (value) => String(value || "-") },
     { key: "rework_date", header: "Date", render: (value) => displayDate(String(value)) },
     { key: "rework_time", header: "Time", render: (value) => displayTime(String(value)) },
+    { key: "parameter_channel_no", header: "Channel", render: (_value, row) => displayOptional(row.parameter_channel_no) },
     { key: "parameter_pressure", header: "Parameter", render: (value) => displayPressure(Number(value)) },
+    { key: "parameter_limit", header: "Pressure Limit (TP LL ~ TP UL)", render: (_value, row) => displayOptional(row.parameter_limit) },
     { key: "pressure_input", header: "Input", render: (value) => displayPressure(Number(value)) },
     {
       key: "result",
@@ -196,21 +201,6 @@ export default function FormManualPage({ publicAccess = false }: FormManualPageP
     }
   }, []);
 
-  const publicManualLink = useMemo(() => {
-    if (typeof window === "undefined") return "/rework-manual";
-    return `${window.location.origin}/rework-manual`;
-  }, []);
-
-  const handleCopyPublicLink = useCallback(async () => {
-    try {
-      await window.navigator.clipboard.writeText(publicManualLink);
-      setCopiedLink(true);
-      window.setTimeout(() => setCopiedLink(false), 1500);
-    } catch {
-      setMessage({ kind: "error", text: "Failed to copy link." });
-    }
-  }, [publicManualLink]);
-
   return (
     <div className={publicAccess ? "mx-auto max-w-5xl space-y-5" : "space-y-6"}>
       {publicAccess ? (
@@ -233,21 +223,6 @@ export default function FormManualPage({ publicAccess = false }: FormManualPageP
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           {!publicAccess ? (
             <>
-              <a
-                className="inline-flex h-11 items-center justify-center rounded-lg border border-sky-600 bg-sky-600 px-4 text-sm font-bold text-white shadow-theme-xs transition hover:border-sky-700 hover:bg-sky-700 focus:outline-none focus:ring-3 focus:ring-sky-500/25"
-                href="/rework-manual"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Public Link
-              </a>
-              <button
-                className="h-11 rounded-lg border border-slate-700 bg-slate-800 px-4 text-sm font-bold text-white shadow-theme-xs transition hover:bg-slate-900 focus:outline-none focus:ring-3 focus:ring-slate-500/25 dark:border-slate-600 dark:bg-slate-700 dark:hover:bg-slate-600"
-                onClick={() => void handleCopyPublicLink()}
-                type="button"
-              >
-                {copiedLink ? "Copied" : "Copy Link"}
-              </button>
               <ExportButton disabled={exporting} onClick={() => void handleExport()}>
                 {exporting ? "Exporting..." : "Export XLSX"}
               </ExportButton>
@@ -438,8 +413,16 @@ export default function FormManualPage({ publicAccess = false }: FormManualPageP
                 <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{displayDate(selectedRecord.rework_date)} / {displayTime(selectedRecord.rework_time)}</p>
               </div>
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
+                <p className={labelClass}>Channel No</p>
+                <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{displayOptional(selectedRecord.parameter_channel_no)}</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
                 <p className={labelClass}>Parameter Pressure</p>
                 <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{displayPressure(selectedRecord.parameter_pressure)}</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
+                <p className={labelClass}>Pressure Limit (TP LL ~ TP UL)</p>
+                <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{displayOptional(selectedRecord.parameter_limit)}</p>
               </div>
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
                 <p className={labelClass}>Pressure Input</p>
@@ -513,7 +496,7 @@ export default function FormManualPage({ publicAccess = false }: FormManualPageP
           data={paginatedRecords}
           emptyMessage="No rework engine history."
           limitOptions={PAGE_SIZE_OPTIONS}
-          minWidth="1120px"
+          minWidth="1320px"
           onLimitChange={(limit) => {
             setPageSize(limit);
             setPage(1);

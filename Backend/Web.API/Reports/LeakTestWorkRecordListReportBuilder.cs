@@ -29,7 +29,7 @@ public static class LeakTestWorkRecordListReportBuilder
         var lastRow = FillTable(worksheet, records);
 
         worksheet.PageSetup.PrintAreas.Clear();
-        worksheet.PageSetup.PrintAreas.Add($"B2:L{lastRow}");
+        worksheet.PageSetup.PrintAreas.Add($"B2:N{lastRow}");
 
         workbook.Properties.Title = "Leak Test Work Record List";
         workbook.Properties.Author = "Leaktester Work Record";
@@ -72,17 +72,19 @@ public static class LeakTestWorkRecordListReportBuilder
 
         worksheet.Column("A").Width = 2;
         worksheet.Column("B").Width = 5;
-        worksheet.Column("C").Width = 18;
+        worksheet.Column("C").Width = 16;
         worksheet.Column("D").Width = 20;
-        worksheet.Column("E").Width = 18;
-        worksheet.Column("F").Width = 13;
-        worksheet.Column("G").Width = 10;
-        worksheet.Column("H").Width = 22;
-        worksheet.Column("I").Width = 17;
-        worksheet.Column("J").Width = 16;
-        worksheet.Column("K").Width = 17;
-        worksheet.Column("L").Width = 11;
-        worksheet.Column("M").Width = 2;
+        worksheet.Column("E").Width = 23;
+        worksheet.Column("F").Width = 16;
+        worksheet.Column("G").Width = 12;
+        worksheet.Column("H").Width = 10;
+        worksheet.Column("I").Width = 15;
+        worksheet.Column("J").Width = 13;
+        worksheet.Column("K").Width = 24;
+        worksheet.Column("L").Width = 15;
+        worksheet.Column("M").Width = 15;
+        worksheet.Column("N").Width = 11;
+        worksheet.Column("O").Width = 2;
 
         worksheet.Row(1).Height = 8;
         worksheet.Row(2).Height = 24;
@@ -98,20 +100,20 @@ public static class LeakTestWorkRecordListReportBuilder
 
         foreach (var address in new[]
         {
-            "B2:C4", "D2:K3", "D4:K4",
-            "B6:K6",
-            "B7:C7", "E7:K7",
-            "B8:C8", "E8:K8",
-            "B10:C10", "E10:F10", "H10:I10", "J10:K10"
+            "B2:C4", "D2:N3", "D4:N4",
+            "B6:N6",
+            "B7:C7", "E7:N7",
+            "B8:C8", "E8:N8",
+            "B10:C10", "E10:F10", "H10:I10"
         })
         {
             worksheet.Range(address).Merge();
         }
 
-        worksheet.Range("B2:K4").Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
-        worksheet.Range("B2:K4").Style.Border.OutsideBorderColor = XLColor.Black;
-        worksheet.Range("B2:K4").Style.Border.InsideBorder = XLBorderStyleValues.Thin;
-        worksheet.Range("B2:K4").Style.Border.InsideBorderColor = XLColor.Black;
+        worksheet.Range("B2:N4").Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+        worksheet.Range("B2:N4").Style.Border.OutsideBorderColor = XLColor.Black;
+        worksheet.Range("B2:N4").Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+        worksheet.Range("B2:N4").Style.Border.InsideBorderColor = XLColor.Black;
 
         worksheet.Range("B2:C4").Style.Fill.BackgroundColor = XLColor.White;
         worksheet.Range("B2:C4").Style.Font.FontColor = XLColor.FromHtml("#0F172A");
@@ -119,19 +121,19 @@ public static class LeakTestWorkRecordListReportBuilder
         worksheet.Range("B2:C4").Style.Font.FontSize = 14;
         worksheet.Range("B2:C4").Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
-        worksheet.Range("D2:K3").Style.Fill.BackgroundColor = XLColor.FromHtml("#F8FAFC");
-        worksheet.Range("D2:K3").Style.Font.FontColor = XLColor.FromHtml("#0F172A");
-        worksheet.Range("D2:K3").Style.Font.Bold = true;
-        worksheet.Range("D2:K3").Style.Font.FontSize = 15;
-        worksheet.Range("D2:K3").Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        worksheet.Range("D2:N3").Style.Fill.BackgroundColor = XLColor.FromHtml("#F8FAFC");
+        worksheet.Range("D2:N3").Style.Font.FontColor = XLColor.FromHtml("#0F172A");
+        worksheet.Range("D2:N3").Style.Font.Bold = true;
+        worksheet.Range("D2:N3").Style.Font.FontSize = 15;
+        worksheet.Range("D2:N3").Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
-        worksheet.Range("D4:K4").Style.Fill.BackgroundColor = XLColor.FromHtml("#0F172A");
-        worksheet.Range("D4:K4").Style.Font.FontColor = XLColor.White;
-        worksheet.Range("D4:K4").Style.Font.Bold = true;
-        worksheet.Range("D4:K4").Style.Font.FontSize = 12;
-        worksheet.Range("D4:K4").Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        worksheet.Range("D4:N4").Style.Fill.BackgroundColor = XLColor.FromHtml("#0F172A");
+        worksheet.Range("D4:N4").Style.Font.FontColor = XLColor.White;
+        worksheet.Range("D4:N4").Style.Font.Bold = true;
+        worksheet.Range("D4:N4").Style.Font.FontSize = 12;
+        worksheet.Range("D4:N4").Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
-        var section = worksheet.Range("B6:K6");
+        var section = worksheet.Range("B6:N6");
         section.Style.Fill.BackgroundColor = XLColor.FromHtml("#D71920");
         section.Style.Font.FontColor = XLColor.White;
         section.Style.Font.Bold = true;
@@ -142,7 +144,7 @@ public static class LeakTestWorkRecordListReportBuilder
         {
             var labelRange = worksheet.Range($"B{row}:C{row}");
             var colonCell = worksheet.Cell($"D{row}");
-            var valueRange = worksheet.Range($"E{row}:K{row}");
+            var valueRange = worksheet.Range($"E{row}:N{row}");
 
             labelRange.Style.Fill.BackgroundColor = XLColor.FromHtml("#F1F5F9");
             labelRange.Style.Font.FontColor = XLColor.FromHtml("#334155");
@@ -155,14 +157,14 @@ public static class LeakTestWorkRecordListReportBuilder
             valueRange.Style.Font.Bold = true;
             valueRange.Style.Alignment.Indent = 1;
 
-            var rowRange = worksheet.Range($"B{row}:K{row}");
+            var rowRange = worksheet.Range($"B{row}:N{row}");
             rowRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
             rowRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
             rowRange.Style.Border.OutsideBorderColor = XLColor.FromHtml("#CBD5E1");
             rowRange.Style.Border.InsideBorderColor = XLColor.FromHtml("#E2E8F0");
         }
 
-        var summary = worksheet.Range("B10:K10");
+        var summary = worksheet.Range("B10:J10");
         summary.Style.Fill.BackgroundColor = XLColor.FromHtml("#F8FAFC");
         summary.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
         summary.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
@@ -174,15 +176,15 @@ public static class LeakTestWorkRecordListReportBuilder
 
         worksheet.Range("B10:D10").Style.Fill.BackgroundColor = XLColor.FromHtml("#FFC000");
         worksheet.Range("E10:G10").Style.Fill.BackgroundColor = XLColor.FromHtml("#92D050");
-        worksheet.Range("H10:K10").Style.Fill.BackgroundColor = XLColor.FromHtml("#FF0000");
-        worksheet.Range("B10:K10").Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
-        worksheet.Range("B10:K10").Style.Border.OutsideBorderColor = XLColor.FromHtml("#FF0000");
-        worksheet.Range("B10:K10").Style.Border.InsideBorder = XLBorderStyleValues.Thin;
-        worksheet.Range("B10:K10").Style.Border.InsideBorderColor = XLColor.White;
+        worksheet.Range("H10:J10").Style.Fill.BackgroundColor = XLColor.FromHtml("#FF0000");
+        worksheet.Range("B10:J10").Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+        worksheet.Range("B10:J10").Style.Border.OutsideBorderColor = XLColor.FromHtml("#FF0000");
+        worksheet.Range("B10:J10").Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+        worksheet.Range("B10:J10").Style.Border.InsideBorderColor = XLColor.White;
         worksheet.Range("B10:C10").Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
         worksheet.Range("B10:C10").Style.Alignment.Indent = 1;
 
-        var tableHeader = worksheet.Range("B12:L12");
+        var tableHeader = worksheet.Range("B12:N12");
         tableHeader.Style.Fill.BackgroundColor = XLColor.FromHtml("#D71920");
         tableHeader.Style.Font.FontColor = XLColor.White;
         tableHeader.Style.Font.Bold = true;
@@ -202,10 +204,10 @@ public static class LeakTestWorkRecordListReportBuilder
     {
         TryAddYanmarLogo(worksheet, logoPath);
 
-        SetText(worksheet, "D2:K3", "PT. Yanmar Diesel Indonesia");
-        SetText(worksheet, "D4:K4", "LEAK TEST WORK RECORD LIST");
+        SetText(worksheet, "D2:N3", "PT. Yanmar Diesel Indonesia");
+        SetText(worksheet, "D4:N4", "LEAK TEST WORK RECORD LIST");
 
-        SetText(worksheet, "B6:K6", "REPORT FILTER");
+        SetText(worksheet, "B6:N6", "REPORT FILTER");
         SetLabelRow(worksheet, 7, "Period", FormatPeriod(dateFrom, dateTo));
         SetLabelRow(worksheet, 8, "Generated At", FormatDateTime(DateTime.Now));
 
@@ -214,7 +216,7 @@ public static class LeakTestWorkRecordListReportBuilder
         SetText(worksheet, "E10:F10", "OK");
         SetText(worksheet, "G10:G10", records.Count(x => string.Equals(x.Result, "OK", StringComparison.OrdinalIgnoreCase)).ToString(ReportCulture));
         SetText(worksheet, "H10:I10", "NG");
-        SetText(worksheet, "J10:K10", records.Count(x => string.Equals(x.Result, "NG", StringComparison.OrdinalIgnoreCase)).ToString(ReportCulture));
+        SetText(worksheet, "J10:J10", records.Count(x => string.Equals(x.Result, "NG", StringComparison.OrdinalIgnoreCase)).ToString(ReportCulture));
     }
 
     private static int FillTable(IXLWorksheet worksheet, IReadOnlyList<LeakTestWorkRecord> records)
@@ -223,12 +225,14 @@ public static class LeakTestWorkRecordListReportBuilder
         {
             "No",
             "Engine Model",
-            "Engine Number",
+            "Serial No",
+            "Barcode Scan",
             "Operator",
             "Date",
             "Time",
-            "Machine Name",
-            "Parameter Pressure",
+            "Channel (Parameter)",
+            "Channel (HMI)",
+            "Parameter Range (TP LL ~ TP UL)",
             "Pressure Input",
             "Cycle Time",
             "Result"
@@ -241,7 +245,7 @@ public static class LeakTestWorkRecordListReportBuilder
 
         if (records.Count == 0)
         {
-            var emptyRange = worksheet.Range("B13:L15");
+            var emptyRange = worksheet.Range("B13:N15");
             emptyRange.Merge();
             emptyRange.FirstCell().Value = "No work records for selected filter.";
             emptyRange.Style.Fill.BackgroundColor = XLColor.White;
@@ -264,16 +268,18 @@ public static class LeakTestWorkRecordListReportBuilder
             worksheet.Cell(row, 2).Value = index + 1;
             worksheet.Cell(row, 3).Value = record.EngineModelName;
             worksheet.Cell(row, 4).Value = record.EngineNumber;
-            worksheet.Cell(row, 5).Value = string.IsNullOrWhiteSpace(record.OperatorName) ? "-" : record.OperatorName;
-            worksheet.Cell(row, 6).Value = FormatDate(record.CheckDate);
-            worksheet.Cell(row, 7).Value = FormatTime(record.CheckTime);
-            worksheet.Cell(row, 8).Value = record.MachineName;
-            worksheet.Cell(row, 9).Value = FormatPressure(record.ParameterPressure);
-            worksheet.Cell(row, 10).Value = FormatPressure(record.PressureInput);
-            worksheet.Cell(row, 11).Value = FormatMinutes(record.CycleTimeLeakTestMinutes);
-            worksheet.Cell(row, 12).Value = record.Result;
+            worksheet.Cell(row, 5).Value = string.IsNullOrWhiteSpace(record.BarcodeScan) ? "-" : record.BarcodeScan;
+            worksheet.Cell(row, 6).Value = string.IsNullOrWhiteSpace(record.OperatorName) ? "-" : record.OperatorName;
+            worksheet.Cell(row, 7).Value = FormatDate(record.CheckDate);
+            worksheet.Cell(row, 8).Value = FormatTime(record.CheckTime);
+            worksheet.Cell(row, 9).Value = string.IsNullOrWhiteSpace(record.ParameterChannelNo) ? "-" : record.ParameterChannelNo;
+            worksheet.Cell(row, 10).Value = string.IsNullOrWhiteSpace(record.ChannelNo) ? "-" : record.ChannelNo;
+            worksheet.Cell(row, 11).Value = string.IsNullOrWhiteSpace(record.ParameterLimit) ? "-" : record.ParameterLimit;
+            worksheet.Cell(row, 12).Value = FormatPressure(record.PressureInput);
+            worksheet.Cell(row, 13).Value = FormatMinutes(record.CycleTimeLeakTestMinutes);
+            worksheet.Cell(row, 14).Value = record.Result;
 
-            var rowRange = worksheet.Range(row, 2, row, 12);
+            var rowRange = worksheet.Range(row, 2, row, 14);
             rowRange.Style.Fill.BackgroundColor = index % 2 == 0 ? XLColor.White : XLColor.FromHtml("#F8FAFC");
             rowRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
             rowRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
@@ -284,13 +290,12 @@ public static class LeakTestWorkRecordListReportBuilder
             rowRange.Style.Alignment.WrapText = true;
 
             worksheet.Range(row, 2, row, 2).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-            worksheet.Range(row, 6, row, 7).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-            worksheet.Range(row, 9, row, 12).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-            worksheet.Range(row, 3, row, 5).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
-            worksheet.Cell(row, 8).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+            worksheet.Range(row, 7, row, 8).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            worksheet.Range(row, 9, row, 14).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            worksheet.Range(row, 3, row, 6).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
 
             var passed = string.Equals(record.Result, "OK", StringComparison.OrdinalIgnoreCase);
-            var resultCell = worksheet.Cell(row, 12);
+            var resultCell = worksheet.Cell(row, 14);
             resultCell.Style.Fill.BackgroundColor = passed ? XLColor.FromHtml("#DCFCE7") : XLColor.FromHtml("#FFE4E6");
             resultCell.Style.Font.FontColor = passed ? XLColor.FromHtml("#166534") : XLColor.FromHtml("#BE123C");
             resultCell.Style.Font.Bold = true;
@@ -299,7 +304,7 @@ public static class LeakTestWorkRecordListReportBuilder
         }
 
         var lastRow = FirstDataRow + records.Count - 1;
-        worksheet.Range(HeaderRow, 2, lastRow, 12).SetAutoFilter();
+        worksheet.Range(HeaderRow, 2, lastRow, 14).SetAutoFilter();
         worksheet.SheetView.FreezeRows(HeaderRow);
         worksheet.ActiveCell = worksheet.Cell("B2");
         return lastRow;
@@ -323,7 +328,7 @@ public static class LeakTestWorkRecordListReportBuilder
     {
         SetText(worksheet, $"B{row}:C{row}", label);
         SetText(worksheet, $"D{row}:D{row}", ":");
-        SetText(worksheet, $"E{row}:K{row}", value);
+        SetText(worksheet, $"E{row}:N{row}", value);
     }
 
     private static void SetText(IXLWorksheet worksheet, string address, string value)

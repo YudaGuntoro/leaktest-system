@@ -14,6 +14,7 @@ public class AppDbContext : DbContext
     public DbSet<AppRole> Roles => Set<AppRole>();
     public DbSet<EngineModel> EngineModels => Set<EngineModel>();
     public DbSet<Operator> Operators => Set<Operator>();
+    public DbSet<LeakTestParameter> LeakTestParameters => Set<LeakTestParameter>();
     public DbSet<LeakTestWorkRecord> LeakTestWorkRecords => Set<LeakTestWorkRecord>();
     public DbSet<ReworkEngineRecord> ReworkEngineRecords => Set<ReworkEngineRecord>();
 
@@ -83,17 +84,39 @@ public class AppDbContext : DbContext
             entity.HasIndex(x => x.OperatorName);
         });
 
+        modelBuilder.Entity<LeakTestParameter>(entity =>
+        {
+            entity.ToTable("leak_test_parameters");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.ChannelNo).HasColumnName("channel_no").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.ModelParameter).HasColumnName("model_parameter").HasMaxLength(150).IsRequired();
+            entity.Property(x => x.ItemName).HasColumnName("item_name").HasMaxLength(120).IsRequired();
+            entity.Property(x => x.ItemValue).HasColumnName("item_value").HasMaxLength(80).IsRequired();
+            entity.Property(x => x.MachineNames).HasColumnName("machine_names").HasMaxLength(1000);
+            entity.Property(x => x.IsDeleted).HasColumnName("is_deleted");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasIndex(x => new { x.ChannelNo, x.ItemName }).IsUnique();
+            entity.HasIndex(x => x.ChannelNo);
+            entity.HasIndex(x => x.ModelParameter);
+        });
+
         modelBuilder.Entity<LeakTestWorkRecord>(entity =>
         {
             entity.ToTable("leak_test_work_records");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.EngineModelId).HasColumnName("engine_model_id");
             entity.Property(x => x.EngineNumber).HasColumnName("engine_number").HasMaxLength(120).IsRequired();
+            entity.Property(x => x.BarcodeScan).HasColumnName("barcode_scan").HasMaxLength(180);
             entity.Property(x => x.CheckDate).HasColumnName("check_date").HasColumnType("date");
             entity.Property(x => x.CheckTime).HasColumnName("check_time").HasMaxLength(8).IsRequired();
             entity.Property(x => x.MachineName).HasColumnName("machine_name").HasMaxLength(150).IsRequired();
             entity.Property(x => x.OperatorId).HasColumnName("operator_id");
             entity.Property(x => x.ParameterPressure).HasColumnName("parameter_pressure").HasPrecision(8, 2);
+            entity.Property(x => x.ChannelNo).HasColumnName("channel_no").HasMaxLength(20);
+            entity.Property(x => x.PressSetUp).HasColumnName("press_set_up").HasPrecision(8, 2);
+            entity.Property(x => x.PressSetLow).HasColumnName("press_set_low").HasPrecision(8, 2);
             entity.Property(x => x.PressureInput).HasColumnName("pressure_input").HasPrecision(8, 2);
             entity.Property(x => x.CycleTimeLeakTestMinutes).HasColumnName("cycle_time_leak_test_minutes").HasPrecision(8, 2);
             entity.Property(x => x.Result).HasColumnName("result").HasMaxLength(10).IsRequired();
@@ -102,6 +125,8 @@ public class AppDbContext : DbContext
             entity.HasOne(x => x.EngineModel).WithMany().HasForeignKey(x => x.EngineModelId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Operator).WithMany().HasForeignKey(x => x.OperatorId).OnDelete(DeleteBehavior.SetNull);
             entity.HasIndex(x => new { x.CheckDate, x.EngineNumber });
+            entity.HasIndex(x => x.BarcodeScan);
+            entity.HasIndex(x => x.ChannelNo);
             entity.HasIndex(x => x.EngineModelId);
             entity.HasIndex(x => x.OperatorId);
         });

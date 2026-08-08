@@ -68,3 +68,5 @@ SOURCE Backend/Web.API.Persistence/Migrations/20260807_001_operators.sql;
 SOURCE Backend/Web.API.Persistence/Migrations/20260807_002_rework_engine_records.sql;
 SOURCE Backend/Web.API.Persistence/Migrations/20260807_003_demo_dashboard_work_records.sql;
 SOURCE Backend/Web.API.Persistence/Migrations/20260807_004_demo_dashboard_monthly_volume.sql;
+SOURCE Backend/Web.API.Persistence/Migrations/20260807_005_leak_test_parameters.sql;
+SOURCE Backend/Web.API.Persistence/Migrations/20260807_006_hmi_work_record_payload.sql;

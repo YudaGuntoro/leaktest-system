@@ -55,18 +55,19 @@ public static class ReworkEngineRecordReportBuilder
         SetLabelRow(worksheet, 11, "Date", FormatDate(record.ReworkDate));
         SetLabelRow(worksheet, 12, "Time", FormatTime(record.ReworkTime));
         SetLabelRow(worksheet, 13, "Operator Name", string.IsNullOrWhiteSpace(record.OperatorName) ? "-" : record.OperatorName);
+        SetLabelRow(worksheet, 14, "Channel No", record.ParameterChannelNo ?? "-");
 
-        SetText(worksheet, "B16:K16", "MANUAL LEAK TEST");
-        SetLabelRow(worksheet, 17, "Parameter Pressure (Standard)", FormatPressure(record.ParameterPressure));
-        SetLabelRow(worksheet, 18, "Pressure Input (Result)", FormatPressure(record.PressureInput));
-        SetLabelRow(worksheet, 19, "Judgement", $"{record.Result} (Manual Leaktest)");
-        SetLabelRow(worksheet, 20, "Note", string.IsNullOrWhiteSpace(record.Note) ? "-" : record.Note);
+        SetText(worksheet, "B17:K17", "MANUAL LEAK TEST");
+        SetLabelRow(worksheet, 18, "Parameter Range (TP LL ~ TP UL)", record.ParameterLimit ?? "-");
+        SetLabelRow(worksheet, 19, "Pressure Input (Result)", FormatPressure(record.PressureInput));
+        SetLabelRow(worksheet, 20, "Judgement", $"{record.Result} (Manual Leaktest)");
+        SetLabelRow(worksheet, 21, "Note", string.IsNullOrWhiteSpace(record.Note) ? "-" : record.Note);
 
-        SetLabelRow(worksheet, 23, "Created At", FormatDateTime(record.CreatedAt));
-        SetLabelRow(worksheet, 24, "Updated At", FormatDateTime(record.UpdatedAt));
-        SetLabelRow(worksheet, 25, "Generated At", FormatDateTime(DateTime.Now));
+        SetLabelRow(worksheet, 24, "Created At", FormatDateTime(record.CreatedAt));
+        SetLabelRow(worksheet, 25, "Updated At", FormatDateTime(record.UpdatedAt));
+        SetLabelRow(worksheet, 26, "Generated At", FormatDateTime(DateTime.Now));
 
-        var resultRange = worksheet.Range("E19:K19");
+        var resultRange = worksheet.Range("E20:K20");
         var passed = string.Equals(record.Result, "OK", StringComparison.OrdinalIgnoreCase);
         resultRange.Style.Fill.BackgroundColor = passed ? XLColor.FromHtml("#DCFCE7") : XLColor.FromHtml("#FFE4E6");
         resultRange.Style.Font.FontColor = passed ? XLColor.FromHtml("#166534") : XLColor.FromHtml("#BE123C");
@@ -89,7 +90,7 @@ public static class ReworkEngineRecordReportBuilder
         worksheet.PageSetup.Margins.Left = 0.2;
         worksheet.PageSetup.Margins.Right = 0.2;
         worksheet.PageSetup.PrintAreas.Clear();
-        worksheet.PageSetup.PrintAreas.Add("B2:K25");
+        worksheet.PageSetup.PrintAreas.Add("B2:K26");
 
         foreach (var address in new[]
         {
@@ -101,14 +102,15 @@ public static class ReworkEngineRecordReportBuilder
             "B11:C11", "E11:K11",
             "B12:C12", "E12:K12",
             "B13:C13", "E13:K13",
-            "B16:K16",
-            "B17:C17", "E17:K17",
+            "B14:C14", "E14:K14",
+            "B17:K17",
             "B18:C18", "E18:K18",
             "B19:C19", "E19:K19",
             "B20:C20", "E20:K20",
-            "B23:C23", "E23:K23",
+            "B21:C21", "E21:K21",
             "B24:C24", "E24:K24",
-            "B25:C25", "E25:K25"
+            "B25:C25", "E25:K25",
+            "B26:C26", "E26:K26"
         })
         {
             worksheet.Range(address).Merge();
@@ -123,15 +125,15 @@ public static class ReworkEngineRecordReportBuilder
             worksheet.Column(column).Width = 8.6;
         }
 
-        worksheet.Rows("1:25").Height = 21;
+        worksheet.Rows("1:26").Height = 21;
         worksheet.Row(1).Height = 8;
         worksheet.Rows("2:4").Height = 24;
         worksheet.Row(5).Height = 10;
         worksheet.Row(6).Height = 8;
         worksheet.Row(7).Height = 23;
-        worksheet.Row(16).Height = 23;
+        worksheet.Row(17).Height = 23;
 
-        worksheet.Range("B2:K25").Style.Fill.BackgroundColor = XLColor.White;
+        worksheet.Range("B2:K26").Style.Fill.BackgroundColor = XLColor.White;
         var headerFrame = worksheet.Range("B2:K4");
         headerFrame.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
         headerFrame.Style.Border.OutsideBorderColor = XLColor.Black;
@@ -150,7 +152,7 @@ public static class ReworkEngineRecordReportBuilder
         worksheet.Range("D4:K4").Style.Font.FontSize = 14;
         worksheet.Range("D4:K4").Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
-        foreach (var address in new[] { "B7:K7", "B16:K16" })
+        foreach (var address in new[] { "B7:K7", "B17:K17" })
         {
             var section = worksheet.Range(address);
             section.Style.Fill.BackgroundColor = XLColor.FromHtml("#D71920");
@@ -159,7 +161,7 @@ public static class ReworkEngineRecordReportBuilder
             section.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
         }
 
-        foreach (var row in new[] { 8, 9, 10, 11, 12, 13, 17, 18, 19, 20, 23, 24, 25 })
+        foreach (var row in new[] { 8, 9, 10, 11, 12, 13, 14, 18, 19, 20, 21, 24, 25, 26 })
         {
             var labelRange = worksheet.Range($"B{row}:C{row}");
             var colonCell = worksheet.Cell($"D{row}");
@@ -183,7 +185,7 @@ public static class ReworkEngineRecordReportBuilder
             rowRange.Style.Border.InsideBorderColor = XLColor.FromHtml("#E2E8F0");
         }
 
-        worksheet.Range("B23:K25").Style.Font.FontSize = 9;
+        worksheet.Range("B24:K26").Style.Font.FontSize = 9;
         worksheet.ShowGridLines = false;
         worksheet.ActiveCell = worksheet.Cell("B2");
     }

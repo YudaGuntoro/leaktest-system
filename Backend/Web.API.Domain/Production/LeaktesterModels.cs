@@ -48,6 +48,36 @@ public class Operator
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 }
 
+public class LeakTestParameter
+{
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
+
+    [JsonPropertyName("channel_no")]
+    public string ChannelNo { get; set; } = string.Empty;
+
+    [JsonPropertyName("model_parameter")]
+    public string ModelParameter { get; set; } = string.Empty;
+
+    [JsonPropertyName("item_name")]
+    public string ItemName { get; set; } = string.Empty;
+
+    [JsonPropertyName("item_value")]
+    public string ItemValue { get; set; } = string.Empty;
+
+    [JsonPropertyName("machine_names")]
+    public string? MachineNames { get; set; }
+
+    [JsonPropertyName("is_deleted")]
+    public bool? IsDeleted { get; set; }
+
+    [JsonPropertyName("created_at")]
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+    [JsonPropertyName("updated_at")]
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
+}
+
 public class LeakTestWorkRecord
 {
     [JsonPropertyName("id")]
@@ -65,6 +95,9 @@ public class LeakTestWorkRecord
 
     [JsonPropertyName("engine_number")]
     public string EngineNumber { get; set; } = string.Empty;
+
+    [JsonPropertyName("barcode_scan")]
+    public string? BarcodeScan { get; set; }
 
     [JsonPropertyName("check_date")]
     public DateTime CheckDate { get; set; } = DateTime.Today;
@@ -88,11 +121,40 @@ public class LeakTestWorkRecord
     [JsonPropertyName("parameter_pressure")]
     public decimal ParameterPressure { get; set; }
 
+    [JsonPropertyName("channel_no")]
+    public string? ChannelNo { get; set; }
+
+    [JsonPropertyName("press_set_up")]
+    public decimal? PressSetUp { get; set; }
+
+    [JsonPropertyName("press_set_low")]
+    public decimal? PressSetLow { get; set; }
+
     [JsonPropertyName("pressure_input")]
     public decimal PressureInput { get; set; }
 
     [JsonPropertyName("cycle_time_leak_test_minutes")]
     public decimal CycleTimeLeakTestMinutes { get; set; }
+
+    [NotMapped]
+    [JsonPropertyName("parameter_channel_no")]
+    public string? ParameterChannelNo { get; set; }
+
+    [NotMapped]
+    [JsonPropertyName("parameter_standard")]
+    public string? ParameterStandard { get; set; }
+
+    [NotMapped]
+    [JsonPropertyName("parameter_min")]
+    public string? ParameterMin { get; set; }
+
+    [NotMapped]
+    [JsonPropertyName("parameter_max")]
+    public string? ParameterMax { get; set; }
+
+    [NotMapped]
+    [JsonPropertyName("parameter_limit")]
+    public string? ParameterLimit { get; set; }
 
     [JsonPropertyName("result")]
     public string Result { get; set; } = "OK";
@@ -150,6 +212,26 @@ public class ReworkEngineRecord
     [JsonPropertyName("pressure_input")]
     public decimal PressureInput { get; set; }
 
+    [NotMapped]
+    [JsonPropertyName("parameter_channel_no")]
+    public string? ParameterChannelNo { get; set; }
+
+    [NotMapped]
+    [JsonPropertyName("parameter_standard")]
+    public string? ParameterStandard { get; set; }
+
+    [NotMapped]
+    [JsonPropertyName("parameter_min")]
+    public string? ParameterMin { get; set; }
+
+    [NotMapped]
+    [JsonPropertyName("parameter_max")]
+    public string? ParameterMax { get; set; }
+
+    [NotMapped]
+    [JsonPropertyName("parameter_limit")]
+    public string? ParameterLimit { get; set; }
+
     [JsonPropertyName("result")]
     public string Result { get; set; } = "OK";
 
@@ -196,6 +278,42 @@ public class CreateOperatorRequest
     public bool? IsDeleted { get; set; }
 }
 
+public class CreateLeakTestParameterRequest
+{
+    [JsonPropertyName("channel_no")]
+    public string ChannelNo { get; set; } = string.Empty;
+
+    [JsonPropertyName("model_parameter")]
+    public string ModelParameter { get; set; } = string.Empty;
+
+    [JsonPropertyName("item_name")]
+    public string ItemName { get; set; } = string.Empty;
+
+    [JsonPropertyName("item_value")]
+    public string ItemValue { get; set; } = string.Empty;
+
+    [JsonPropertyName("machine_names")]
+    public string? MachineNames { get; set; }
+
+    [JsonPropertyName("is_deleted")]
+    public bool? IsDeleted { get; set; }
+}
+
+public class LeakTestParameterImportResult
+{
+    [JsonPropertyName("imported")]
+    public int Imported { get; set; }
+
+    [JsonPropertyName("updated")]
+    public int Updated { get; set; }
+
+    [JsonPropertyName("skipped")]
+    public int Skipped { get; set; }
+
+    [JsonPropertyName("channels")]
+    public int Channels { get; set; }
+}
+
 public class CreateLeakTestWorkRecordRequest
 {
     [JsonPropertyName("engine_model_id")]
@@ -203,6 +321,9 @@ public class CreateLeakTestWorkRecordRequest
 
     [JsonPropertyName("engine_number")]
     public string EngineNumber { get; set; } = string.Empty;
+
+    [JsonPropertyName("barcode_scan")]
+    public string? BarcodeScan { get; set; }
 
     [JsonPropertyName("check_date")]
     public DateTime CheckDate { get; set; } = DateTime.Today;
@@ -219,6 +340,15 @@ public class CreateLeakTestWorkRecordRequest
     [JsonPropertyName("parameter_pressure")]
     public decimal ParameterPressure { get; set; }
 
+    [JsonPropertyName("channel_no")]
+    public string? ChannelNo { get; set; }
+
+    [JsonPropertyName("press_set_up")]
+    public decimal? PressSetUp { get; set; }
+
+    [JsonPropertyName("press_set_low")]
+    public decimal? PressSetLow { get; set; }
+
     [JsonPropertyName("pressure_input")]
     public decimal PressureInput { get; set; }
 
@@ -227,6 +357,58 @@ public class CreateLeakTestWorkRecordRequest
 
     [JsonPropertyName("result")]
     public string Result { get; set; } = "OK";
+}
+
+public class CreateHmiLeakTestWorkRecordRequest
+{
+    [JsonPropertyName("barcode")]
+    public string? Barcode { get; set; }
+
+    [JsonPropertyName("barcode_scan")]
+    public string? BarcodeScan { get; set; }
+
+    [JsonPropertyName("engine_model")]
+    public string? EngineModel { get; set; }
+
+    [JsonPropertyName("serial_no")]
+    public string? SerialNo { get; set; }
+
+    [JsonPropertyName("serial no")]
+    public string? SerialNoText { get; set; }
+
+    [JsonPropertyName("engine_number")]
+    public string? EngineNumber { get; set; }
+
+    [JsonPropertyName("machine_name")]
+    public string? MachineName { get; set; }
+
+    [JsonPropertyName("operator")]
+    public string? Operator { get; set; }
+
+    [JsonPropertyName("channel_no")]
+    public string? ChannelNo { get; set; }
+
+    [JsonPropertyName("press_set_up")]
+    [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+    public decimal? PressSetUp { get; set; }
+
+    [JsonPropertyName("press_set_low")]
+    [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+    public decimal? PressSetLow { get; set; }
+
+    [JsonPropertyName("pressure_input")]
+    [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+    public decimal PressureInput { get; set; }
+
+    [JsonPropertyName("cycle_time")]
+    [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+    public decimal CycleTime { get; set; }
+
+    [JsonPropertyName("judgement")]
+    public string? Judgement { get; set; }
+
+    [JsonPropertyName("tested_at")]
+    public DateTime? TestedAt { get; set; }
 }
 
 public class CreateReworkEngineRecordRequest
