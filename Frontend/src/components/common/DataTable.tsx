@@ -129,6 +129,24 @@ const getColumnRowSpan = <T extends object>(
   return rowSpan;
 };
 
+const isFirstMergedGroupRow = <T extends object>(
+  data: T[],
+  columns: DataTableColumn<T>[],
+  index: number
+) => {
+  if (index === 0) {
+    return false;
+  }
+
+  const groupColumn = columns.find((column) => column.rowSpanKey);
+  if (!groupColumn?.rowSpanKey) {
+    return false;
+  }
+
+  return normalizeRowSpanKey(groupColumn.rowSpanKey(data[index]))
+    !== normalizeRowSpanKey(groupColumn.rowSpanKey(data[index - 1]));
+};
+
 const formatCellValue = (value: unknown) => {
   if (value === null || value === undefined || value === "") {
     return "-";
@@ -321,7 +339,7 @@ export default function DataTable<T extends object>({
         </div>
       )}
 
-      <div className="mx-4 mb-4 mt-2 rounded-lg overflow-hidden border border-gray-100 dark:border-white/[0.05]">
+      <div className="mx-4 mb-4 mt-2 overflow-hidden rounded-lg border border-gray-200 dark:border-slate-700">
         <div className="max-w-full overflow-x-auto">
         <div style={{ minWidth }}>
           <Table>
@@ -361,7 +379,7 @@ export default function DataTable<T extends object>({
               </TableRow>
             </TableHeader>
 
-            <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
+            <TableBody className="divide-y divide-gray-200 dark:divide-slate-700">
               {isLoading &&
                 Array.from({ length: currentLimit }).map((_, index) => (
                   <TableRow key={`loading-${index}`}>
@@ -397,36 +415,40 @@ export default function DataTable<T extends object>({
 
               {!isLoading &&
                 !error &&
-                data.map((row, index) => (
-                  <TableRow
-                    className={onRowClick ? "cursor-pointer transition hover:bg-gray-50 dark:hover:bg-white/[0.03]" : undefined}
-                    key={getRowKey(row, index, rowKey)}
-                    onClick={() => onRowClick?.(row)}
-                  >
-                    {columns.map((column) => {
-                      const value = getColumnValue(row, column);
-                      const rowSpan = getColumnRowSpan(data, column, index);
+                data.map((row, index) => {
+                  const isGroupStart = isFirstMergedGroupRow(data, columns, index);
 
-                      if (rowSpan === 0) {
-                        return null;
-                      }
+                  return (
+                    <TableRow
+                      className={`${isGroupStart ? "border-t-2 border-slate-300 dark:border-slate-600" : ""} ${onRowClick ? "cursor-pointer transition hover:bg-gray-50 dark:hover:bg-white/[0.03]" : ""}`}
+                      key={getRowKey(row, index, rowKey)}
+                      onClick={() => onRowClick?.(row)}
+                    >
+                      {columns.map((column) => {
+                        const value = getColumnValue(row, column);
+                        const rowSpan = getColumnRowSpan(data, column, index);
 
-                      return (
-                        <TableCell
-                          key={column.key}
-                          rowSpan={rowSpan}
-                          className={`align-middle px-5 py-4 text-theme-sm text-gray-700 dark:text-gray-300 ${
-                            alignClasses[column.align ?? "left"]
-                          } ${column.className ?? ""}`}
-                        >
-                          {column.render
-                            ? column.render(value, row, index)
-                            : formatCellValue(value)}
-                        </TableCell>
-                      );
-                    })}
-                  </TableRow>
-                ))}
+                        if (rowSpan === 0) {
+                          return null;
+                        }
+
+                        return (
+                          <TableCell
+                            key={column.key}
+                            rowSpan={rowSpan}
+                            className={`align-middle px-5 py-4 text-theme-sm text-gray-700 dark:text-gray-300 ${
+                              alignClasses[column.align ?? "left"]
+                            } ${column.className ?? ""}`}
+                          >
+                            {column.render
+                              ? column.render(value, row, index)
+                              : formatCellValue(value)}
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  );
+                })}
             </TableBody>
           </Table>
           </div>
