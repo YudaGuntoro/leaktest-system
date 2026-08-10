@@ -261,14 +261,14 @@ export default function SettingPage() {
         </div>
 
         <div className="overflow-x-auto p-5">
-          <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-sm">
-            <thead>
-              <tr className="text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
-                <th className="w-32 border-b border-slate-200 px-3 pb-3 dark:border-slate-800">Code</th>
-                <th className="border-b border-slate-200 px-3 pb-3 dark:border-slate-800">Judgement Name</th>
-                <th className="w-36 border-b border-slate-200 px-3 pb-3 dark:border-slate-800">Result</th>
-                <th className="border-b border-slate-200 px-3 pb-3 dark:border-slate-800">Note</th>
-                <th className="w-32 border-b border-slate-200 px-3 pb-3 text-right dark:border-slate-800">Action</th>
+          <table className="leak-rounded-header-table w-full min-w-[760px] border-separate border-spacing-0 text-left text-sm">
+            <thead className="bg-transparent text-xs uppercase text-white">
+              <tr>
+                <th className="w-32 rounded-l-lg bg-brand-500 px-5 py-3">Code</th>
+                <th className="bg-brand-500 px-4 py-3">Judgement Name</th>
+                <th className="w-36 bg-brand-500 px-4 py-3">Result</th>
+                <th className="bg-brand-500 px-4 py-3">Note</th>
+                <th className="w-32 rounded-r-lg bg-brand-500 px-5 py-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
