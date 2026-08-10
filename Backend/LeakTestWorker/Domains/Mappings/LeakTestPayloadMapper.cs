@@ -29,9 +29,11 @@ public static class LeakTestPayloadMapper
         "pressure_input",
         "pressureInput",
         "PressureInput",
+        "press_input",
         "judgement",
         "result",
-        "Result"
+        "Result",
+        "ts"
     ];
 
     public static LeakTestHistoryRecord ToHistoryRecord(string topic, string payload)
@@ -49,7 +51,7 @@ public static class LeakTestPayloadMapper
             Data = SelectDataObject(root)
         };
 
-        var timestamp = ReadDateTime(message.Data, "tested_at", "testedAt", "TestedAt", "timestamp", "Timestamp", "created_at", "CreatedAt", "date_time", "DateTime", "test_datetime", "TestDateTime");
+        var timestamp = ReadDateTime(message.Data, "tested_at", "testedAt", "TestedAt", "timestamp", "Timestamp", "ts", "created_at", "CreatedAt", "date_time", "DateTime", "test_datetime", "TestDateTime");
         var checkDate = ReadDate(message.Data, "check_date", "checkDate", "CheckDate", "date", "Date", "test_date", "TestDate")
             ?? timestamp?.Date
             ?? DateTime.Today;
@@ -79,8 +81,8 @@ public static class LeakTestPayloadMapper
             ParameterPressure = parameterPressure ?? 0,
             PressSetUp = pressSetUp,
             PressSetLow = pressSetLow,
-            PressureInput = ReadDecimal(message.Data, "pressure_input", "pressureInput", "PressureInput", "actual_pressure", "ActualPressure", "leak_pressure", "LeakPressure") ?? 0,
-            CycleTimeLeakTestMinutes = ReadDecimal(message.Data, "cycle_time_leak_test_minutes", "cycleTimeLeakTestMinutes", "CycleTimeLeakTestMinutes", "cycle_time", "cycleTime", "CycleTime", "test_minutes", "TestMinutes") ?? 0,
+            PressureInput = NormalizeCosmoPressure(ReadDecimal(message.Data, "pressure_input", "pressureInput", "PressureInput", "press_input", "actual_pressure", "ActualPressure", "leak_pressure", "LeakPressure") ?? 0),
+            CycleTimeLeakTestMinutes = ReadCycleTime(message.Data) ?? 0,
             Result = NormalizeResult(ReadString(message.Data, "result", "Result", "judgement", "Judgement", "status", "Status")) ?? string.Empty
         };
 
@@ -167,6 +169,20 @@ public static class LeakTestPayloadMapper
             : null;
     }
 
+    private static decimal? ReadCycleTime(JObject source)
+    {
+        var explicitValue = ReadDecimal(source, "cycle_time_leak_test_minutes", "cycleTimeLeakTestMinutes", "CycleTimeLeakTestMinutes", "test_minutes", "TestMinutes");
+        if (explicitValue.HasValue)
+        {
+            return explicitValue.Value;
+        }
+
+        var rawCycleTime = ReadDecimal(source, "cycle_time", "cycleTime", "CycleTime");
+        return rawCycleTime.HasValue
+            ? Math.Round(rawCycleTime.Value / 10, 2)
+            : null;
+    }
+
     private static DateTime? ReadDate(JObject source, params string[] names)
     {
         var dateTime = ReadDateTime(source, names);
@@ -236,7 +252,7 @@ public static class LeakTestPayloadMapper
         return value.Trim().ToUpperInvariant() switch
         {
             "OK" or "PASS" or "PASSED" or "TRUE" or "1" => "OK",
-            "NG" or "NOK" or "FAIL" or "FAILED" or "FALSE" or "0" => "NG",
+            "NG" or "NOK" or "FAIL" or "FAILED" or "FALSE" or "0" or "2" => "NG",
             _ => null
         };
     }

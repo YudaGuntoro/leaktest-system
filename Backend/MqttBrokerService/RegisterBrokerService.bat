@@ -1,12 +1,12 @@
 @echo off
 SETLOCAL EnableExtensions EnableDelayedExpansion
 
-SET "SERVICE_NAME=LeakTestWorker"
-SET "DISPLAY_NAME=Leak Test Worker"
-SET "SERVICE_DESCRIPTION=PT. Yanmar Leak Test MQTT Worker"
+SET "SERVICE_NAME=LeakTestMqttBroker"
+SET "DISPLAY_NAME=Leak Test MQTT Broker"
+SET "SERVICE_DESCRIPTION=PT. Yanmar Leak Test MQTT Broker Service"
 SET "BAT_DIR=%~dp0"
 SET "APP_DIR=%BAT_DIR:~0,-1%"
-SET "PROJECT_FILE=%APP_DIR%\LeakTestWorker.csproj"
+SET "PROJECT_FILE=%APP_DIR%\MqttBrokerService.csproj"
 SET "PUBLISH_DIR=%APP_DIR%\bin\Release\net8.0\publish"
 
 echo Registering %SERVICE_NAME% as Windows Service...
@@ -18,7 +18,6 @@ IF ERRORLEVEL 1 (
     pause
     exit /b 1
 )
-
 
 IF EXIST "%PROJECT_FILE%" (
     echo Source project detected. Publishing Release output...
@@ -33,8 +32,8 @@ IF EXIST "%PROJECT_FILE%" (
     SET "APP_DIR=%PUBLISH_DIR%"
 )
 
-SET "EXE_PATH=%APP_DIR%\LeakTestWorker.exe"
-SET "DLL_PATH=%APP_DIR%\LeakTestWorker.dll"
+SET "EXE_PATH=%APP_DIR%\MqttBrokerService.exe"
+SET "DLL_PATH=%APP_DIR%\MqttBrokerService.dll"
 SET "DOTNET_PATH="
 
 IF EXIST "%EXE_PATH%" (
@@ -46,12 +45,12 @@ IF EXIST "%EXE_PATH%" (
         )
 
         IF NOT DEFINED DOTNET_PATH (
-            echo ERROR: LeakTestWorker.exe was not found and dotnet.exe is not available in PATH.
+            echo ERROR: MqttBrokerService.exe was not found and dotnet.exe is not available in PATH.
             pause
             exit /b 1
         )
     ) ELSE (
-        echo ERROR: Neither LeakTestWorker.exe nor LeakTestWorker.dll was found in:
+        echo ERROR: Neither MqttBrokerService.exe nor MqttBrokerService.dll was found in:
         echo %APP_DIR%
         pause
         exit /b 1

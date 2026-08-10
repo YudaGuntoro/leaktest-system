@@ -70,3 +70,7 @@ SOURCE Backend/Web.API.Persistence/Migrations/20260807_003_demo_dashboard_work_r
 SOURCE Backend/Web.API.Persistence/Migrations/20260807_004_demo_dashboard_monthly_volume.sql;
 SOURCE Backend/Web.API.Persistence/Migrations/20260807_005_leak_test_parameters.sql;
 SOURCE Backend/Web.API.Persistence/Migrations/20260807_006_hmi_work_record_payload.sql;
+SOURCE Backend/Web.API.Persistence/Migrations/20260810_001_system_settings_units.sql;
+SOURCE Backend/Web.API.Persistence/Migrations/20260810_002_history_operator_snapshot.sql;
+SOURCE Backend/Web.API.Persistence/Migrations/20260810_003_drop_history_operator_id.sql;
+SOURCE Backend/Web.API.Persistence/Migrations/20260810_004_plc_ip_setting.sql;

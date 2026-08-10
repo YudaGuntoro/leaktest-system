@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using ClosedXML.Excel;
 using System.Globalization;
+using System.Net.NetworkInformation;
 using Web.API.Domain.Production;
 using Web.API.Persistence.Context;
 using Web.API.Reports;
@@ -150,7 +151,6 @@ public class LeaktesterController : ApiControllerBase
 
             var record = await _db.LeakTestWorkRecords.AsNoTracking()
                 .Include(x => x.EngineModel)
-                .Include(x => x.Operator)
                 .FirstOrDefaultAsync(x => x.Id == id);
 
             if (record is null)
@@ -202,17 +202,7 @@ public class LeaktesterController : ApiControllerBase
                 throw new ArgumentException("Cycle time leak test must be greater than zero.");
             }
 
-            Operator? operatorItem = null;
-            if (request.OperatorId is > 0)
-            {
-                operatorItem = await _db.Operators
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(x => x.Id == request.OperatorId.Value && x.IsDeleted != true);
-                if (operatorItem is null)
-                {
-                    throw new ArgumentException("Operator was not found or is inactive.");
-                }
-            }
+            var operatorName = FirstText(request.OperatorName);
 
             var result = request.Result.Trim().ToUpperInvariant();
             if (result is not ("OK" or "NG"))
@@ -228,7 +218,7 @@ public class LeaktesterController : ApiControllerBase
                 CheckDate = request.CheckDate.Date,
                 CheckTime = NormalizeCheckTime(request.CheckTime),
                 MachineName = request.MachineName.Trim(),
-                OperatorId = operatorItem?.Id,
+                OperatorName = string.IsNullOrWhiteSpace(operatorName) ? null : TrimTo(operatorName, 150),
                 ParameterPressure = request.ParameterPressure,
                 ChannelNo = string.IsNullOrWhiteSpace(request.ChannelNo) ? null : TrimTo(request.ChannelNo, 20),
                 PressSetUp = request.PressSetUp,
@@ -243,7 +233,6 @@ public class LeaktesterController : ApiControllerBase
             _db.LeakTestWorkRecords.Add(record);
             await _db.SaveChangesAsync();
             record.EngineModel = engineModel;
-            record.Operator = operatorItem;
             await HydrateWorkRecordParameterContextAsync(new[] { record });
             return ApiCreated(record, "Leak test work record saved successfully.");
         }
@@ -299,7 +288,6 @@ public class LeaktesterController : ApiControllerBase
             }
 
             var engineModel = await FindOrCreateEngineModelAsync(engineModelText);
-            var operatorItem = await FindOrCreateOperatorAsync(request.Operator);
             var testedAt = request.TestedAt ?? DateTime.Now;
 
             var record = new LeakTestWorkRecord
@@ -312,7 +300,7 @@ public class LeaktesterController : ApiControllerBase
                 MachineName = string.IsNullOrWhiteSpace(request.MachineName)
                     ? "Leak Tester Machine 1"
                     : TrimTo(request.MachineName, 150),
-                OperatorId = operatorItem?.Id,
+                OperatorName = string.IsNullOrWhiteSpace(request.Operator) ? null : TrimTo(request.Operator, 150),
                 ParameterPressure = parameterPressure,
                 ChannelNo = string.IsNullOrWhiteSpace(request.ChannelNo) ? null : TrimTo(request.ChannelNo, 20),
                 PressSetUp = request.PressSetUp,
@@ -327,7 +315,6 @@ public class LeaktesterController : ApiControllerBase
             _db.LeakTestWorkRecords.Add(record);
             await _db.SaveChangesAsync();
             record.EngineModel = engineModel;
-            record.Operator = operatorItem;
             await HydrateWorkRecordParameterContextAsync(new[] { record });
             return ApiCreated(record, "HMI leak test work record saved successfully.");
         }
@@ -348,6 +335,8 @@ public class LeaktesterController : ApiControllerBase
         [FromQuery(Name = "barcode_scan")] string? barcodeScan,
         [FromQuery] string? result)
     {
+        await EnsureReworkEngineRecordOperatorSnapshotColumnAsync();
+
         var records = await ReworkEngineRecordQuery(date, dateFrom, dateTo, engineModel, engineNumber, barcodeScan, result)
             .OrderByDescending(x => x.ReworkDate)
             .ThenByDescending(x => x.ReworkTime)
@@ -372,6 +361,8 @@ public class LeaktesterController : ApiControllerBase
     {
         try
         {
+            await EnsureReworkEngineRecordOperatorSnapshotColumnAsync();
+
             var records = await ReworkEngineRecordQuery(date, dateFrom, dateTo, engineModel, engineNumber, barcodeScan, result)
                 .OrderByDescending(x => x.ReworkDate)
                 .ThenByDescending(x => x.ReworkTime)
@@ -406,9 +397,10 @@ public class LeaktesterController : ApiControllerBase
     {
         try
         {
+            await EnsureReworkEngineRecordOperatorSnapshotColumnAsync();
+
             var record = await _db.ReworkEngineRecords.AsNoTracking()
                 .Include(x => x.EngineModel)
-                .Include(x => x.Operator)
                 .FirstOrDefaultAsync(x => x.Id == id);
 
             if (record is null)
@@ -433,6 +425,8 @@ public class LeaktesterController : ApiControllerBase
     {
         try
         {
+            await EnsureReworkEngineRecordOperatorSnapshotColumnAsync();
+
             if (string.IsNullOrWhiteSpace(request.BarcodeScan))
             {
                 throw new ArgumentException("Barcode scan is required.");
@@ -449,17 +443,7 @@ public class LeaktesterController : ApiControllerBase
                 throw new ArgumentException("Result must be OK or NG.");
             }
 
-            Operator? operatorItem = null;
-            if (request.OperatorId is > 0)
-            {
-                operatorItem = await _db.Operators
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(x => x.Id == request.OperatorId.Value && x.IsDeleted != true);
-                if (operatorItem is null)
-                {
-                    throw new ArgumentException("Operator was not found or is inactive.");
-                }
-            }
+            var operatorName = FirstText(request.OperatorName);
 
             var (barcodeEngineModel, barcodeEngineNumber) = ParseBarcodeScan(request.BarcodeScan);
             if (string.IsNullOrWhiteSpace(barcodeEngineNumber))
@@ -489,7 +473,7 @@ public class LeaktesterController : ApiControllerBase
                 BarcodeScan = request.BarcodeScan.Trim(),
                 ReworkDate = request.ReworkDate.Date,
                 ReworkTime = NormalizeCheckTime(request.ReworkTime),
-                OperatorId = operatorItem?.Id,
+                OperatorName = string.IsNullOrWhiteSpace(operatorName) ? null : TrimTo(operatorName, 150),
                 ParameterPressure = request.ParameterPressure,
                 PressureInput = request.PressureInput,
                 Result = result,
@@ -501,7 +485,6 @@ public class LeaktesterController : ApiControllerBase
             _db.ReworkEngineRecords.Add(record);
             await _db.SaveChangesAsync();
             record.EngineModel = engineModel;
-            record.Operator = operatorItem;
             await HydrateReworkEngineParameterContextAsync(new[] { record });
             return ApiCreated(record, "Rework engine record saved successfully.");
         }
@@ -582,6 +565,63 @@ public class LeaktesterController : ApiControllerBase
         return ApiOk(await query
             .OrderBy(x => x.OperatorCode)
             .ToListAsync());
+    }
+
+    [AllowAnonymous]
+    [HttpGet("settings")]
+    public async Task<IActionResult> Settings()
+    {
+        try
+        {
+            await EnsureSystemSettingsTablesAsync();
+            return ApiOk(await GetSystemSettingsResponseAsync());
+        }
+        catch (Exception ex)
+        {
+            return ApiBadRequest(ex);
+        }
+    }
+
+    [HttpPut("settings")]
+    public async Task<IActionResult> UpdateSettings([FromBody] UpdateSystemSettingsRequest request)
+    {
+        try
+        {
+            await EnsureSystemSettingsTablesAsync();
+
+            var pressureUnitId = await FindOrCreateMeasurementUnitAsync("pressure", request.PressureUnit, request.PressureUnit);
+            var cycleTimeUnitId = await FindOrCreateMeasurementUnitAsync("cycle_time", request.CycleTimeUnit, request.CycleTimeUnit);
+            var schedule = NormalizeBackupSchedule(request.BackupSchedule);
+
+            var setting = await _db.SystemSettings.FirstOrDefaultAsync(x => x.Id == 1);
+            if (setting is null)
+            {
+                setting = new SystemSetting
+                {
+                    Id = 1,
+                    CreatedAt = DateTime.Now
+                };
+                _db.SystemSettings.Add(setting);
+            }
+
+            setting.PressureUnitId = pressureUnitId;
+            setting.CycleTimeUnitId = cycleTimeUnitId;
+            setting.BackupDbLocation = string.IsNullOrWhiteSpace(request.BackupDbLocation)
+                ? null
+                : TrimTo(request.BackupDbLocation, 500);
+            setting.BackupSchedule = schedule;
+            setting.PlcIpAddress = string.IsNullOrWhiteSpace(request.PlcIpAddress)
+                ? null
+                : TrimTo(request.PlcIpAddress, 80);
+            setting.UpdatedAt = DateTime.Now;
+
+            await _db.SaveChangesAsync();
+            return ApiOk(await GetSystemSettingsResponseAsync(), "Settings updated successfully.");
+        }
+        catch (Exception ex)
+        {
+            return ApiBadRequest(ex);
+        }
     }
 
     [HttpGet("parameters")]
@@ -816,20 +856,18 @@ public class LeaktesterController : ApiControllerBase
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(request.OperatorCode))
-            {
-                throw new ArgumentException("Operator code is required.");
-            }
-
             if (string.IsNullOrWhiteSpace(request.OperatorName))
             {
                 throw new ArgumentException("Operator name is required.");
             }
 
+            var operatorCode = await BuildNextOperatorCodeAsync();
+            var operatorName = request.OperatorName.Trim();
+
             var item = new Operator
             {
-                OperatorCode = request.OperatorCode.Trim(),
-                OperatorName = request.OperatorName.Trim(),
+                OperatorCode = operatorCode,
+                OperatorName = operatorName,
                 Department = string.IsNullOrWhiteSpace(request.Department) ? null : request.Department.Trim(),
                 Note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim(),
                 IsDeleted = request.IsDeleted ?? false,
@@ -845,6 +883,79 @@ public class LeaktesterController : ApiControllerBase
         {
             return ApiBadRequest(ex);
         }
+    }
+
+    [HttpPut("operators/{id:int}")]
+    public async Task<IActionResult> UpdateOperator(int id, [FromBody] CreateOperatorRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.OperatorName))
+            {
+                throw new ArgumentException("Operator name is required.");
+            }
+
+            var item = await _db.Operators.FirstOrDefaultAsync(x => x.Id == id);
+            if (item is null)
+            {
+                return ApiNotFound("Operator was not found.");
+            }
+
+            var operatorName = request.OperatorName.Trim();
+
+            item.OperatorName = operatorName;
+            item.Department = string.IsNullOrWhiteSpace(request.Department) ? null : request.Department.Trim();
+            item.Note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim();
+            item.IsDeleted = request.IsDeleted ?? false;
+            item.UpdatedAt = DateTime.Now;
+
+            await _db.SaveChangesAsync();
+            return ApiOk(item, "Operator updated successfully.");
+        }
+        catch (Exception ex)
+        {
+            return ApiBadRequest(ex);
+        }
+    }
+
+    [HttpDelete("operators/{id:int}")]
+    public async Task<IActionResult> DeleteOperator(int id)
+    {
+        try
+        {
+            var item = await _db.Operators.FirstOrDefaultAsync(x => x.Id == id);
+            if (item is null)
+            {
+                return ApiNotFound("Operator was not found.");
+            }
+
+            item.IsDeleted = true;
+            item.UpdatedAt = DateTime.Now;
+            await _db.SaveChangesAsync();
+            return ApiOk(item, "Operator deleted successfully.");
+        }
+        catch (Exception ex)
+        {
+            return ApiBadRequest(ex);
+        }
+    }
+
+    private async Task<string> BuildNextOperatorCodeAsync()
+    {
+        const string prefix = "LT-OP-";
+        var codes = await _db.Operators
+            .AsNoTracking()
+            .Where(x => x.OperatorCode.StartsWith(prefix))
+            .Select(x => x.OperatorCode)
+            .ToListAsync();
+
+        var maxNumber = codes
+            .Select(code => code[prefix.Length..])
+            .Select(value => int.TryParse(value, out var number) ? number : 0)
+            .DefaultIfEmpty(0)
+            .Max();
+
+        return $"{prefix}{maxNumber + 1:0000}";
     }
 
     [HttpPost("engine-models")]
@@ -890,6 +1001,31 @@ public class LeaktesterController : ApiControllerBase
         });
     }
 
+    [AllowAnonymous]
+    [HttpGet("plc/status")]
+    public async Task<IActionResult> PlcStatus()
+    {
+        try
+        {
+            await EnsureSystemSettingsTablesAsync();
+            var settings = await GetSystemSettingsResponseAsync();
+            var plcIpAddress = settings.PlcIpAddress.Trim();
+            var isOnline = await CheckPlcReachableAsync(plcIpAddress);
+
+            return ApiOk(new
+            {
+                plc_ip_address = plcIpAddress,
+                configured = !string.IsNullOrWhiteSpace(plcIpAddress),
+                online = isOnline,
+                checked_at = DateTime.Now
+            });
+        }
+        catch (Exception ex)
+        {
+            return ApiBadRequest(ex);
+        }
+    }
+
     private async Task EnsureLeakTestWorkRecordHmiColumnsAsync()
     {
         await EnsureColumnAsync(
@@ -908,6 +1044,11 @@ public class LeaktesterController : ApiControllerBase
             "leak_test_work_records",
             "press_set_low",
             "ALTER TABLE leak_test_work_records ADD COLUMN press_set_low DECIMAL(8, 2) NULL AFTER press_set_up");
+        await EnsureColumnAsync(
+            "leak_test_work_records",
+            "operator_name",
+            "ALTER TABLE leak_test_work_records ADD COLUMN operator_name VARCHAR(150) NULL AFTER machine_name");
+        await DropHistoryOperatorIdColumnsAsync();
         await EnsureIndexAsync(
             "leak_test_work_records",
             "ix_leak_test_work_records_barcode_scan",
@@ -916,6 +1057,109 @@ public class LeaktesterController : ApiControllerBase
             "leak_test_work_records",
             "ix_leak_test_work_records_channel_no",
             "CREATE INDEX ix_leak_test_work_records_channel_no ON leak_test_work_records (channel_no)");
+    }
+
+    private async Task EnsureReworkEngineRecordOperatorSnapshotColumnAsync()
+    {
+        await EnsureColumnAsync(
+            "rework_engine_records",
+            "operator_name",
+            "ALTER TABLE rework_engine_records ADD COLUMN operator_name VARCHAR(150) NULL AFTER rework_time");
+        await DropHistoryOperatorIdColumnsAsync();
+    }
+
+    private async Task DropHistoryOperatorIdColumnsAsync()
+    {
+        await _db.Database.ExecuteSqlRawAsync(@"
+SET @has_work_operator_id := (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'leak_test_work_records'
+      AND COLUMN_NAME = 'operator_id'
+);
+SET @sql := IF(
+    @has_work_operator_id > 0,
+    'UPDATE leak_test_work_records records JOIN operators operators_master ON operators_master.id = records.operator_id SET records.operator_name = operators_master.operator_name WHERE records.operator_name IS NULL',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @has_rework_operator_id := (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'rework_engine_records'
+      AND COLUMN_NAME = 'operator_id'
+);
+SET @sql := IF(
+    @has_rework_operator_id > 0,
+    'UPDATE rework_engine_records records JOIN operators operators_master ON operators_master.id = records.operator_id SET records.operator_name = operators_master.operator_name WHERE records.operator_name IS NULL',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @has_work_fk := (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'leak_test_work_records'
+      AND CONSTRAINT_NAME = 'fk_leak_test_work_records_operator'
+);
+SET @sql := IF(@has_work_fk > 0, 'ALTER TABLE leak_test_work_records DROP FOREIGN KEY fk_leak_test_work_records_operator', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @has_rework_fk := (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'rework_engine_records'
+      AND CONSTRAINT_NAME = 'fk_rework_engine_records_operator'
+);
+SET @sql := IF(@has_rework_fk > 0, 'ALTER TABLE rework_engine_records DROP FOREIGN KEY fk_rework_engine_records_operator', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @has_work_index := (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'leak_test_work_records'
+      AND INDEX_NAME = 'ix_leak_test_work_records_operator_id'
+);
+SET @sql := IF(@has_work_index > 0, 'DROP INDEX ix_leak_test_work_records_operator_id ON leak_test_work_records', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @has_rework_index := (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'rework_engine_records'
+      AND INDEX_NAME = 'ix_rework_engine_records_operator_id'
+);
+SET @sql := IF(@has_rework_index > 0, 'DROP INDEX ix_rework_engine_records_operator_id ON rework_engine_records', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql := IF(@has_work_operator_id > 0, 'ALTER TABLE leak_test_work_records DROP COLUMN operator_id', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql := IF(@has_rework_operator_id > 0, 'ALTER TABLE rework_engine_records DROP COLUMN operator_id', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;");
     }
 
     private async Task EnsureColumnAsync(string tableName, string columnName, string alterSql)
@@ -1324,8 +1568,7 @@ public class LeaktesterController : ApiControllerBase
         string? result)
     {
         IQueryable<LeakTestWorkRecord> query = _db.LeakTestWorkRecords.AsNoTracking()
-            .Include(x => x.EngineModel)
-            .Include(x => x.Operator);
+            .Include(x => x.EngineModel);
 
         if (dateFrom.HasValue || dateTo.HasValue)
         {
@@ -1400,8 +1643,7 @@ public class LeaktesterController : ApiControllerBase
         string? result)
     {
         IQueryable<ReworkEngineRecord> query = _db.ReworkEngineRecords.AsNoTracking()
-            .Include(x => x.EngineModel)
-            .Include(x => x.Operator);
+            .Include(x => x.EngineModel);
 
         if (dateFrom.HasValue || dateTo.HasValue)
         {
@@ -1613,5 +1855,161 @@ CREATE TABLE IF NOT EXISTS leak_test_parameters (
     {
         var trimmed = checkTime.Trim();
         return trimmed.Length == 5 ? $"{trimmed}:00" : trimmed;
+    }
+
+    private async Task EnsureSystemSettingsTablesAsync()
+    {
+        await _db.Database.ExecuteSqlRawAsync(@"
+CREATE TABLE IF NOT EXISTS measurement_units (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    unit_category VARCHAR(50) NOT NULL,
+    unit_symbol VARCHAR(20) NOT NULL,
+    unit_name VARCHAR(80) NOT NULL,
+    is_deleted TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_measurement_units_category_symbol (unit_category, unit_symbol)
+)");
+
+        await _db.Database.ExecuteSqlRawAsync(@"
+INSERT INTO measurement_units
+    (unit_category, unit_symbol, unit_name, is_deleted)
+VALUES
+    ('pressure', 'MPa', 'Megapascal', 0),
+    ('cycle_time', 's', 'Second', 0)
+ON DUPLICATE KEY UPDATE
+    unit_name = VALUES(unit_name),
+    is_deleted = VALUES(is_deleted),
+    updated_at = CURRENT_TIMESTAMP");
+
+        await _db.Database.ExecuteSqlRawAsync(@"
+CREATE TABLE IF NOT EXISTS system_settings (
+    id INT PRIMARY KEY,
+    pressure_unit_id INT NOT NULL,
+    cycle_time_unit_id INT NOT NULL,
+    backup_db_location VARCHAR(500) NULL,
+    backup_schedule VARCHAR(20) NOT NULL DEFAULT 'daily',
+    plc_ip_address VARCHAR(80) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_system_settings_pressure_unit
+        FOREIGN KEY (pressure_unit_id) REFERENCES measurement_units (id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+    CONSTRAINT fk_system_settings_cycle_time_unit
+        FOREIGN KEY (cycle_time_unit_id) REFERENCES measurement_units (id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+)");
+
+        await EnsureColumnAsync(
+            "system_settings",
+            "plc_ip_address",
+            "ALTER TABLE system_settings ADD COLUMN plc_ip_address VARCHAR(80) NULL AFTER backup_schedule");
+
+        await EnsureDefaultSystemSettingAsync();
+    }
+
+    private async Task EnsureDefaultSystemSettingAsync()
+    {
+        var exists = await _db.SystemSettings.AsNoTracking().AnyAsync(x => x.Id == 1);
+        if (exists)
+        {
+            return;
+        }
+
+        var pressureUnitId = await FindOrCreateMeasurementUnitAsync("pressure", "MPa", "Megapascal");
+        var cycleTimeUnitId = await FindOrCreateMeasurementUnitAsync("cycle_time", "s", "Second");
+
+        _db.SystemSettings.Add(new SystemSetting
+        {
+            Id = 1,
+            PressureUnitId = pressureUnitId,
+            CycleTimeUnitId = cycleTimeUnitId,
+            BackupSchedule = "daily",
+            CreatedAt = DateTime.Now,
+            UpdatedAt = DateTime.Now
+        });
+        await _db.SaveChangesAsync();
+    }
+
+    private async Task<SystemSettingsResponse> GetSystemSettingsResponseAsync()
+    {
+        var setting = await _db.SystemSettings
+            .AsNoTracking()
+            .Include(x => x.PressureUnit)
+            .Include(x => x.CycleTimeUnit)
+            .FirstOrDefaultAsync(x => x.Id == 1);
+
+        return new SystemSettingsResponse
+        {
+            PressureUnit = setting?.PressureUnit?.UnitSymbol ?? "MPa",
+            CycleTimeUnit = setting?.CycleTimeUnit?.UnitSymbol ?? "s",
+            BackupDbLocation = setting?.BackupDbLocation ?? string.Empty,
+            BackupSchedule = setting?.BackupSchedule ?? "daily",
+            PlcIpAddress = setting?.PlcIpAddress ?? string.Empty
+        };
+    }
+
+    private static async Task<bool> CheckPlcReachableAsync(string plcIpAddress)
+    {
+        if (string.IsNullOrWhiteSpace(plcIpAddress))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var ping = new Ping();
+            var reply = await ping.SendPingAsync(plcIpAddress, 1000);
+            return reply.Status == IPStatus.Success;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task<int> FindOrCreateMeasurementUnitAsync(string category, string? symbol, string? name)
+    {
+        var unitSymbol = string.IsNullOrWhiteSpace(symbol) ? (category == "pressure" ? "MPa" : "s") : TrimTo(symbol, 20);
+        var unitName = string.IsNullOrWhiteSpace(name) ? unitSymbol : TrimTo(name, 80);
+
+        var existing = await _db.MeasurementUnits
+            .FirstOrDefaultAsync(x => x.UnitCategory == category && x.UnitSymbol == unitSymbol);
+        if (existing is not null)
+        {
+            if (existing.IsDeleted == true)
+            {
+                existing.IsDeleted = false;
+                existing.UpdatedAt = DateTime.Now;
+                await _db.SaveChangesAsync();
+            }
+
+            return existing.Id;
+        }
+
+        var unit = new MeasurementUnit
+        {
+            UnitCategory = category,
+            UnitSymbol = unitSymbol,
+            UnitName = unitName,
+            IsDeleted = false,
+            CreatedAt = DateTime.Now,
+            UpdatedAt = DateTime.Now
+        };
+        _db.MeasurementUnits.Add(unit);
+        await _db.SaveChangesAsync();
+        return unit.Id;
+    }
+
+    private static string NormalizeBackupSchedule(string? value)
+    {
+        return value?.Trim().ToLowerInvariant() switch
+        {
+            "weekly" => "weekly",
+            "monthly" => "monthly",
+            _ => "daily"
+        };
     }
 }

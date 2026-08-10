@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { apiGet } from "@/lib/api";
 import {
   API_ACTIVITY_EVENT,
@@ -12,8 +12,15 @@ type LeaktesterStatus = {
   server_time?: string;
 };
 
-const MQTT_STALE_MS = 60_000;
-const STATUS_POLL_MS = 10_000;
+type PlcStatus = {
+  checked_at?: string;
+  configured: boolean;
+  online: boolean;
+  plc_ip_address?: string;
+};
+
+const MQTT_STATUS_POLL_MS = 10_000;
+const PLC_STATUS_POLL_MS = 5_000;
 
 const timeFormatter = new Intl.DateTimeFormat("en-GB", {
   hour: "2-digit",
@@ -39,7 +46,7 @@ function formatTime(value?: string | null) {
 export default function MqttStatus() {
   const [lastApiAt, setLastApiAt] = useState<string | null>(null);
   const [lastMqttAt, setLastMqttAt] = useState<string | null>(null);
-  const [now, setNow] = useState(() => Date.now());
+  const [plcOnline, setPlcOnline] = useState(false);
 
   useEffect(() => {
     const handleApiActivity = (event: Event) => {
@@ -68,7 +75,7 @@ export default function MqttStatus() {
     };
 
     void loadStatus();
-    const timer = window.setInterval(() => void loadStatus(), STATUS_POLL_MS);
+    const timer = window.setInterval(() => void loadStatus(), MQTT_STATUS_POLL_MS);
 
     return () => {
       ignore = true;
@@ -77,20 +84,35 @@ export default function MqttStatus() {
   }, []);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
+    let ignore = false;
 
-  const mqttOnline = useMemo(() => {
-    const date = parseDate(lastMqttAt);
-    return Boolean(date && now - date.getTime() <= MQTT_STALE_MS);
-  }, [lastMqttAt, now]);
+    const loadPlcStatus = async () => {
+      try {
+        const status = await apiGet<PlcStatus>("/api/leaktester/plc/status");
+        if (!ignore) {
+          setPlcOnline(Boolean(status.configured && status.online));
+        }
+      } catch {
+        if (!ignore) {
+          setPlcOnline(false);
+        }
+      }
+    };
+
+    void loadPlcStatus();
+    const timer = window.setInterval(() => void loadPlcStatus(), PLC_STATUS_POLL_MS);
+
+    return () => {
+      ignore = true;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   return (
     <div className="flex h-11 max-w-full items-center gap-3 overflow-hidden rounded-lg border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-500 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 sm:px-4">
-      <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 font-bold ${mqttOnline ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300" : "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300"}`}>
-        <span className={`size-2 rounded-full ${mqttOnline ? "bg-emerald-500" : "bg-rose-500"}`} />
-        {mqttOnline ? "Online" : "Offline"}
+      <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 font-bold ${plcOnline ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300" : "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300"}`}>
+        <span className={`size-2 rounded-full ${plcOnline ? "bg-emerald-500" : "bg-rose-500"}`} />
+        {plcOnline ? "Online" : "Offline"}
       </span>
       <span className="h-5 w-px shrink-0 bg-gray-200 dark:bg-gray-800" />
       <span className="truncate">

@@ -10,12 +10,12 @@ import { ArrowRightIcon, ChevronLeftIcon } from "@/icons";
 import { useTheme } from "@/context/ThemeContext";
 import { apiGet } from "@/lib/api";
 import type { LeakTestMonthlySummary, LeakTestWorkRecord } from "./types";
+import { displayNumber, fetchSystemSettings, getUnitSettings, type UnitSettings } from "./settings";
 import { todayParam } from "./ui";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
   ssr: false,
 });
-const PRESSURE_UNIT = "MPa";
 const DEFAULT_TABLE_PAGE_SIZE = 10;
 const TABLE_PAGE_SIZE_OPTIONS = [10, 25, 50, 0];
 const datePickerInputClass = "h-10 rounded-lg border-gray-200 bg-white px-4 pr-10 text-sm font-black text-slate-900 shadow-theme-xs focus:border-brand-400 focus:ring-brand-400/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white";
@@ -51,10 +51,6 @@ function displayShortDate(value: string) {
 
 function displayTime(value: string) {
   return value.split(".")[0].slice(0, 5);
-}
-
-function displayPressure(value: number) {
-  return `${Number(value).toFixed(2)} ${PRESSURE_UNIT}`;
 }
 
 function dateToParam(date: Date) {
@@ -104,6 +100,24 @@ export default function ProductionDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [tablePage, setTablePage] = useState(1);
   const [tablePageSize, setTablePageSize] = useState(DEFAULT_TABLE_PAGE_SIZE);
+  const [unitSettings, setUnitSettings] = useState<UnitSettings>(() => getUnitSettings());
+  const pressureUnit = unitSettings.pressureUnit.trim() || "MPa";
+
+  useEffect(() => {
+    let ignore = false;
+    void fetchSystemSettings().then((settings) => {
+      if (!ignore) {
+        setUnitSettings({
+          cycleTimeUnit: settings.cycleTimeUnit,
+          pressureUnit: settings.pressureUnit,
+        });
+      }
+    });
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const selectedDateParams = useMemo(
     () => getDateRangeParams(dateRangeStart, dateRangeEnd),
@@ -694,7 +708,7 @@ export default function ProductionDashboard() {
                 <th className="rounded-l-lg bg-brand-500 px-5 py-3">Engine Model</th>
                 <th className="bg-brand-500 px-4 py-3">Engine Number</th>
                 <th className="bg-brand-500 px-4 py-3">Date / Time</th>
-                <th className="bg-brand-500 px-4 py-3">Pressure Input</th>
+                <th className="bg-brand-500 px-4 py-3">Pressure Input ({pressureUnit})</th>
                 <th className="rounded-r-lg bg-brand-500 px-5 py-3">Judgement</th>
               </tr>
             </thead>
@@ -704,7 +718,7 @@ export default function ProductionDashboard() {
                   <td className="px-5 py-4 font-bold text-slate-900 dark:text-white">{record.engine_model}</td>
                   <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{record.engine_number}</td>
                   <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{displayDate(record.check_date)} / {displayTime(record.check_time)}</td>
-                  <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{displayPressure(record.pressure_input)}</td>
+                  <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{displayNumber(record.pressure_input)}</td>
                   <td className="px-5 py-4">
                     <span className={`rounded-full px-3 py-1 text-xs font-black ${record.result === "OK" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300" : "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300"}`}>
                       {record.result}

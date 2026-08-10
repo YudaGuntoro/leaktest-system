@@ -8,9 +8,9 @@ import { Modal } from "@/components/ui/modal";
 import { ArrowRightIcon, ChevronLeftIcon } from "@/icons";
 import { apiDownload, apiGet } from "@/lib/api";
 import type { EngineModel, LeakTestParameter, LeakTestResult, LeakTestWorkRecord } from "./types";
+import { displayNumber, displayUnitlessText, fetchSystemSettings, getUnitSettings, type UnitSettings } from "./settings";
 import { todayParam } from "./ui";
 
-const PRESSURE_UNIT = "MPa";
 const DEFAULT_TABLE_PAGE_SIZE = 10;
 const TABLE_PAGE_SIZE_OPTIONS = [10, 25, 50, 0];
 const datePickerInputClass = "h-10 rounded-lg border-gray-200 bg-white px-4 pr-10 text-sm font-black text-slate-900 shadow-theme-xs focus:border-brand-400 focus:ring-brand-400/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white";
@@ -41,12 +41,20 @@ function displayDateTime(value: string) {
   }).format(date);
 }
 
-function displayPressure(value: number) {
-  return `${Number(value).toFixed(2)} ${PRESSURE_UNIT}`;
-}
-
 function displayOptional(value?: string | null) {
   return value && value.trim() ? value : "-";
+}
+
+function pressureInputStateClass(result: LeakTestResult) {
+  return result === "OK"
+    ? "border-emerald-400/70 bg-emerald-50 text-emerald-700 dark:border-emerald-400/70 dark:bg-emerald-500/10 dark:text-emerald-300"
+    : "border-rose-400/80 bg-rose-50 text-rose-700 dark:border-rose-400/80 dark:bg-rose-500/10 dark:text-rose-300";
+}
+
+function pressureInputTextClass(result: LeakTestResult) {
+  return result === "OK"
+    ? "text-emerald-700 dark:text-emerald-300"
+    : "text-rose-700 dark:text-rose-300";
 }
 
 function normalizeModelKey(value?: string | null) {
@@ -210,16 +218,22 @@ async function exportWorkRecordListToXlsx(filterQuery: string, dateRangeStart: s
 }
 
 function DetailItem({
+  className = "",
   label,
   value,
+  valueClassName = "text-slate-900 dark:text-white",
 }: {
+  className?: string;
   label: string;
   value: ReactNode;
+  valueClassName?: string;
 }) {
+  const surfaceClass = className || "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950";
+
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
+    <div className={`rounded-lg border px-4 py-3 ${surfaceClass}`}>
       <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">{label}</p>
-      <div className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{value}</div>
+      <div className={`mt-2 text-sm font-bold ${valueClassName}`}>{value}</div>
     </div>
   );
 }
@@ -239,6 +253,25 @@ export default function WorkRecordPage() {
   const [tablePage, setTablePage] = useState(1);
   const [tablePageSize, setTablePageSize] = useState(DEFAULT_TABLE_PAGE_SIZE);
   const [message, setMessage] = useState<{ kind: "error"; text: string } | null>(null);
+  const [unitSettings, setUnitSettings] = useState<UnitSettings>(() => getUnitSettings());
+  const pressureUnit = unitSettings.pressureUnit.trim() || "MPa";
+  const cycleTimeUnit = unitSettings.cycleTimeUnit.trim() || "s";
+
+  useEffect(() => {
+    let ignore = false;
+    void fetchSystemSettings().then((settings) => {
+      if (!ignore) {
+        setUnitSettings({
+          cycleTimeUnit: settings.cycleTimeUnit,
+          pressureUnit: settings.pressureUnit,
+        });
+      }
+    });
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const resetTableView = useCallback(() => {
     setSelectedRecord(null);
@@ -516,9 +549,9 @@ export default function WorkRecordPage() {
                 <th className="bg-brand-500 px-4 py-3">Date</th>
                 <th className="bg-brand-500 px-4 py-3">Time</th>
                 <th className="bg-brand-500 px-4 py-3">Channel</th>
-                <th className="bg-brand-500 px-4 py-3">Pressure Limit (TP LL ~ TP UL)</th>
-                <th className="bg-brand-500 px-4 py-3">Pressure Input</th>
-                <th className="bg-brand-500 px-4 py-3">Cycle Time</th>
+                <th className="bg-brand-500 px-4 py-3">Pressure Limit (TP LL ~ TP UL) ({pressureUnit})</th>
+                <th className="bg-brand-500 px-4 py-3">Pressure Input ({pressureUnit})</th>
+                <th className="bg-brand-500 px-4 py-3">Cycle Time ({cycleTimeUnit})</th>
                 <th className="rounded-r-lg bg-brand-500 px-5 py-3">Result</th>
               </tr>
             </thead>
@@ -547,9 +580,13 @@ export default function WorkRecordPage() {
                     <td className="px-4 py-4 font-semibold text-slate-600 dark:text-slate-300">{displayDate(record.check_date)}</td>
                     <td className="px-4 py-4 font-semibold text-slate-600 dark:text-slate-300">{displayTime(record.check_time)}</td>
                     <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{parameterContext.channelNo}</td>
-                    <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{parameterContext.limit}</td>
-                    <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{displayPressure(record.pressure_input)}</td>
-                    <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{record.cycle_time_leak_test_minutes} menit</td>
+                    <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{displayUnitlessText(parameterContext.limit)}</td>
+                    <td className="px-4 py-4">
+                      <span className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-black ${pressureInputStateClass(record.result)}`}>
+                        {displayNumber(record.pressure_input)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{record.cycle_time_leak_test_minutes}</td>
                     <td className="px-5 py-4">
                       <span className={`rounded-full px-3 py-1 text-xs font-black ${record.result === "OK" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300" : "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300"}`}>
                         {record.result}
@@ -627,10 +664,15 @@ export default function WorkRecordPage() {
               <DetailItem label="Time" value={displayTime(selectedRecord.check_time)} />
               <DetailItem label="Operator" value={selectedRecord.operator_name || "-"} />
               <DetailItem label="Channel No" value={parameterContext.channelNo} />
-              <DetailItem label="Pressure Limit (TP LL ~ TP UL)" value={parameterContext.limit} />
-              <DetailItem label="Pressure Setting" value={displayPressure(selectedRecord.parameter_pressure)} />
-              <DetailItem label="Pressure Input" value={displayPressure(selectedRecord.pressure_input)} />
-              <DetailItem label="Cycle Time" value={`${selectedRecord.cycle_time_leak_test_minutes} menit`} />
+              <DetailItem label={`Pressure Limit (TP LL ~ TP UL) (${pressureUnit})`} value={displayUnitlessText(parameterContext.limit)} />
+              <DetailItem label={`Pressure Setting (${pressureUnit})`} value={displayNumber(selectedRecord.parameter_pressure)} />
+              <DetailItem
+                className={pressureInputStateClass(selectedRecord.result)}
+                label={`Pressure Input (${pressureUnit})`}
+                value={displayNumber(selectedRecord.pressure_input)}
+                valueClassName={pressureInputTextClass(selectedRecord.result)}
+              />
+              <DetailItem label={`Cycle Time (${cycleTimeUnit})`} value={selectedRecord.cycle_time_leak_test_minutes} />
               <DetailItem
                 label="Result"
                 value={

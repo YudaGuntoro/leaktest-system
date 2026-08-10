@@ -8,9 +8,7 @@ namespace Web.API.Reports;
 public static class ReworkEngineRecordReportBuilder
 {
     public const string ContentType = LeakTestWorkRecordReportBuilder.ContentType;
-
     private static readonly CultureInfo ReportCulture = CultureInfo.InvariantCulture;
-
     public static byte[] Build(ReworkEngineRecord record, string templatePath)
     {
         using var workbook = new XLWorkbook();
@@ -40,7 +38,6 @@ public static class ReworkEngineRecordReportBuilder
         var judgement = SanitizeFileName(record.Result).ToUpperInvariant();
         return $"Manual_Leaktest_{modelName}_{engineNumber}_{record.ReworkDate:yyyyMMdd}_Judgement_{judgement}.xlsx";
     }
-
     private static void FillRecord(IXLWorksheet worksheet, ReworkEngineRecord record, string logoPath)
     {
         TryAddYanmarLogo(worksheet, logoPath);

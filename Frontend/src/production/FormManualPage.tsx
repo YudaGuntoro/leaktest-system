@@ -9,6 +9,7 @@ import LeaktesterBrand from "@/components/brand/LeaktesterBrand";
 import { CloseIcon } from "@/icons";
 import { apiDownload, apiGet, apiPost } from "@/lib/api";
 import type { LeakTestResult, Operator, ReworkEngineRecord } from "./types";
+import { displayNumber, displayUnitlessText, fetchSystemSettings, getUnitSettings, type UnitSettings } from "./settings";
 import { ProductionDatePicker, todayParam } from "./ui";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -22,10 +23,6 @@ function displayDate(value: string) {
 
 function displayTime(value: string) {
   return value.split(".")[0].slice(0, 5);
-}
-
-function displayPressure(value: number) {
-  return `${Number(value).toFixed(2)} MPa`;
 }
 
 function displayOptional(value?: string | null) {
@@ -62,6 +59,24 @@ export default function FormManualPage({ publicAccess = false }: FormManualPageP
   const [barcodeScanFilter, setBarcodeScanFilter] = useState("");
   const [resultFilter, setResultFilter] = useState<"" | LeakTestResult>("");
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [unitSettings, setUnitSettings] = useState<UnitSettings>(() => getUnitSettings());
+  const pressureUnit = unitSettings.pressureUnit.trim() || "MPa";
+
+  useEffect(() => {
+    let ignore = false;
+    void fetchSystemSettings().then((settings) => {
+      if (!ignore) {
+        setUnitSettings({
+          cycleTimeUnit: settings.cycleTimeUnit,
+          pressureUnit: settings.pressureUnit,
+        });
+      }
+    });
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const filterQuery = useMemo(() => {
     const params = new URLSearchParams();
@@ -113,9 +128,9 @@ export default function FormManualPage({ publicAccess = false }: FormManualPageP
     { key: "rework_date", header: "Date", render: (value) => displayDate(String(value)) },
     { key: "rework_time", header: "Time", render: (value) => displayTime(String(value)) },
     { key: "parameter_channel_no", header: "Channel", render: (_value, row) => displayOptional(row.parameter_channel_no) },
-    { key: "parameter_pressure", header: "Parameter", render: (value) => displayPressure(Number(value)) },
-    { key: "parameter_limit", header: "Pressure Limit (TP LL ~ TP UL)", render: (_value, row) => displayOptional(row.parameter_limit) },
-    { key: "pressure_input", header: "Input", render: (value) => displayPressure(Number(value)) },
+    { key: "parameter_pressure", header: `Parameter (${pressureUnit})`, render: (value) => displayNumber(Number(value)) },
+    { key: "parameter_limit", header: `Pressure Limit (TP LL ~ TP UL) (${pressureUnit})`, render: (_value, row) => displayUnitlessText(row.parameter_limit) },
+    { key: "pressure_input", header: `Input (${pressureUnit})`, render: (value) => displayNumber(Number(value)) },
     {
       key: "result",
       header: "Result",
@@ -140,7 +155,7 @@ export default function FormManualPage({ publicAccess = false }: FormManualPageP
     try {
       await apiPost<ReworkEngineRecord>("/api/leaktester/rework-engine-records", {
         barcode_scan: form.get("barcode_scan"),
-        operator_id: Number(form.get("operator_id")) || null,
+        operator_name: form.get("operator_name"),
         parameter_pressure: Number(form.get("parameter_pressure")),
         pressure_input: Number(form.get("pressure_input")),
         result: form.get("result"),
@@ -272,19 +287,19 @@ export default function FormManualPage({ publicAccess = false }: FormManualPageP
             </label>
             <label className={labelClass}>
               Operator
-              <select className={`${publicInputClass} mt-2`} name="operator_id">
+              <select className={`${publicInputClass} mt-2`} name="operator_name">
                 <option value="">-</option>
                 {operators.map((operator) => (
-                  <option key={operator.id} value={operator.id}>{operator.operator_name}</option>
+                  <option key={operator.id} value={operator.operator_name}>{operator.operator_name}</option>
                 ))}
               </select>
             </label>
             <label className={labelClass}>
-              Parameter
+              Parameter ({pressureUnit})
               <input className={`${publicInputClass} mt-2`} inputMode="decimal" name="parameter_pressure" placeholder="0.30" required />
             </label>
             <label className={labelClass}>
-              Pressure Input
+              Pressure Input ({pressureUnit})
               <input className={`${publicInputClass} mt-2`} inputMode="decimal" name="pressure_input" placeholder="0.30" required />
             </label>
             <label className={labelClass}>
@@ -339,19 +354,19 @@ export default function FormManualPage({ publicAccess = false }: FormManualPageP
             </label>
             <label className={labelClass}>
               Operator
-              <select className={`${inputClass} mt-2`} name="operator_id">
+              <select className={`${inputClass} mt-2`} name="operator_name">
                 <option value="">-</option>
                 {operators.map((operator) => (
-                  <option key={operator.id} value={operator.id}>{operator.operator_name}</option>
+                  <option key={operator.id} value={operator.operator_name}>{operator.operator_name}</option>
                 ))}
               </select>
             </label>
             <label className={labelClass}>
-              Parameter
+              Parameter ({pressureUnit})
               <input className={`${inputClass} mt-2`} inputMode="decimal" name="parameter_pressure" placeholder="0.30" required />
             </label>
             <label className={labelClass}>
-              Pressure Input
+              Pressure Input ({pressureUnit})
               <input className={`${inputClass} mt-2`} inputMode="decimal" name="pressure_input" placeholder="0.30" required />
             </label>
             <label className={labelClass}>
@@ -417,16 +432,16 @@ export default function FormManualPage({ publicAccess = false }: FormManualPageP
                 <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{displayOptional(selectedRecord.parameter_channel_no)}</p>
               </div>
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
-                <p className={labelClass}>Parameter Pressure</p>
-                <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{displayPressure(selectedRecord.parameter_pressure)}</p>
+                <p className={labelClass}>Parameter Pressure ({pressureUnit})</p>
+                <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{displayNumber(selectedRecord.parameter_pressure)}</p>
               </div>
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
-                <p className={labelClass}>Pressure Limit (TP LL ~ TP UL)</p>
-                <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{displayOptional(selectedRecord.parameter_limit)}</p>
+                <p className={labelClass}>Pressure Limit (TP LL ~ TP UL) ({pressureUnit})</p>
+                <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{displayUnitlessText(selectedRecord.parameter_limit)}</p>
               </div>
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
-                <p className={labelClass}>Pressure Input</p>
-                <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{displayPressure(selectedRecord.pressure_input)}</p>
+                <p className={labelClass}>Pressure Input ({pressureUnit})</p>
+                <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{displayNumber(selectedRecord.pressure_input)}</p>
               </div>
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
                 <p className={labelClass}>Result</p>

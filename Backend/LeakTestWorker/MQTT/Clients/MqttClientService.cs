@@ -13,7 +13,7 @@ public sealed class MqttClientService : BackgroundService, IMqttClientService
 {
     private const string DefaultBrokerAddress = "127.0.0.1";
     private const string DefaultClientId = "LeakTestWorker";
-    private const string DefaultTopic = "/LeakTest";
+    private const string DefaultTopic = "leaktest_mqtt";
     private const int DefaultPort = 1883;
 
     private readonly ILogger<MqttClientService> _logger;
@@ -46,7 +46,7 @@ public sealed class MqttClientService : BackgroundService, IMqttClientService
         _clientId = ReadSetting(cfg, "MQTT", "ClientId", "MQTT__ClientId", "MQTT_CLIENT_ID") ?? DefaultClientId;
         _username = ReadSetting(cfg, "MQTT", "Username", "MQTT__Username", "MQTT_USERNAME");
         _password = ReadSetting(cfg, "MQTT", "Password", "MQTT__Password", "MQTT_PASSWORD");
-        _qos = ReadIntSetting(cfg, "MQTT", "Qos", 1, "MQTT__Qos", "MQTT_QOS");
+        _qos = ReadIntSetting(cfg, "MQTT", "Qos", 2, "MQTT__Qos", "MQTT_QOS");
         _retryDelay = TimeSpan.FromSeconds(Math.Max(1, ReadIntSetting(
             cfg,
             "Worker",

@@ -32,15 +32,14 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
         try
         {
             var engineModelId = await ResolveEngineModelIdAsync(connection, transaction, record, cancellationToken);
-            var operatorId = await ResolveOperatorIdAsync(connection, transaction, record, cancellationToken);
             var barcodeScan = FirstText(record.BarcodeScan, BuildBarcodeScan(record.EngineModel, record.EngineNumber));
 
             await connection.ExecuteAsync(new CommandDefinition(
                 """
                 INSERT INTO leak_test_work_records
-                    (engine_model_id, engine_number, barcode_scan, check_date, check_time, machine_name, operator_id, parameter_pressure, channel_no, press_set_up, press_set_low, pressure_input, cycle_time_leak_test_minutes, result, created_at, updated_at)
+                    (engine_model_id, engine_number, barcode_scan, check_date, check_time, machine_name, operator_name, parameter_pressure, channel_no, press_set_up, press_set_low, pressure_input, cycle_time_leak_test_minutes, result, created_at, updated_at)
                 VALUES
-                    (@engine_model_id, @engine_number, @barcode_scan, @check_date, @check_time, @machine_name, @operator_id, @parameter_pressure, @channel_no, @press_set_up, @press_set_low, @pressure_input, @cycle_time, @result, NOW(), NOW());
+                    (@engine_model_id, @engine_number, @barcode_scan, @check_date, @check_time, @machine_name, @operator_name, @parameter_pressure, @channel_no, @press_set_up, @press_set_low, @pressure_input, @cycle_time, @result, NOW(), NOW());
                 """,
                 new
                 {
@@ -50,7 +49,7 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
                     check_date = record.CheckDate.Date,
                     check_time = Clamp(record.CheckTime, 8),
                     machine_name = Clamp(record.MachineName, 150),
-                    operator_id = operatorId,
+                    operator_name = DbText(record.Operator, 150),
                     parameter_pressure = record.ParameterPressure,
                     channel_no = DbText(record.ChannelNo, 20),
                     press_set_up = record.PressSetUp,
@@ -100,26 +99,6 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
         return await FindOrCreateEngineModelAsync(connection, transaction, record.EngineModel, cancellationToken);
     }
 
-    private async Task<int?> ResolveOperatorIdAsync(
-        MySqlConnection connection,
-        MySqlTransaction transaction,
-        LeakTestHistoryRecord record,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(record.Operator))
-        {
-            return null;
-        }
-
-        var existingId = await FindOperatorAsync(connection, transaction, record.Operator, cancellationToken);
-        if (existingId.HasValue)
-        {
-            return existingId.Value;
-        }
-
-        return await FindOrCreateOperatorAsync(connection, transaction, record.Operator, cancellationToken);
-    }
-
     private static async Task<int?> FindEngineModelByIdAsync(
         MySqlConnection connection,
         MySqlTransaction transaction,
@@ -155,98 +134,13 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
             cancellationToken: cancellationToken));
     }
 
-    private static async Task<int?> FindOperatorAsync(
-        MySqlConnection connection,
-        MySqlTransaction transaction,
-        string operatorText,
-        CancellationToken cancellationToken)
-    {
-        return await connection.ExecuteScalarAsync<int?>(new CommandDefinition(
-            """
-            SELECT id
-            FROM operators
-            WHERE operator_code = @operator OR operator_name = @operator
-            LIMIT 1;
-            """,
-            new { @operator = operatorText.Trim() },
-            transaction,
-            cancellationToken: cancellationToken));
-    }
-
-    private static async Task<int> FindOrCreateOperatorAsync(
-        MySqlConnection connection,
-        MySqlTransaction transaction,
-        string operatorText,
-        CancellationToken cancellationToken)
-    {
-        var operatorCode = await BuildUniqueOperatorCodeAsync(connection, transaction, operatorText, cancellationToken);
-
-        await connection.ExecuteAsync(new CommandDefinition(
-            """
-            INSERT INTO operators (operator_code, operator_name, department, note, is_deleted, created_at, updated_at)
-            VALUES (@operator_code, @operator_name, 'Production', 'Created by HMI payload', 0, NOW(), NOW())
-            ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), updated_at = NOW();
-            """,
-            new
-            {
-                operator_code = operatorCode,
-                operator_name = Clamp(operatorText, 150)
-            },
-            transaction,
-            cancellationToken: cancellationToken));
-
-        return await connection.ExecuteScalarAsync<int>(new CommandDefinition(
-            "SELECT LAST_INSERT_ID();",
-            transaction: transaction,
-            cancellationToken: cancellationToken));
-    }
-
-    private static async Task<string> BuildUniqueOperatorCodeAsync(
-        MySqlConnection connection,
-        MySqlTransaction transaction,
-        string operatorText,
-        CancellationToken cancellationToken)
-    {
-        var alphanumeric = new string(operatorText
-            .Where(char.IsLetterOrDigit)
-            .Select(char.ToUpperInvariant)
-            .ToArray());
-        var baseCode = Clamp($"HMI-{(string.IsNullOrWhiteSpace(alphanumeric) ? "OPERATOR" : alphanumeric)}", 50);
-        var code = baseCode;
-        var suffix = 1;
-
-        while (await OperatorCodeExistsAsync(connection, transaction, code, cancellationToken))
-        {
-            var suffixText = $"-{suffix}";
-            var prefixLength = Math.Min(baseCode.Length, 50 - suffixText.Length);
-            code = $"{baseCode[..prefixLength]}{suffixText}";
-            suffix++;
-        }
-
-        return code;
-    }
-
-    private static async Task<bool> OperatorCodeExistsAsync(
-        MySqlConnection connection,
-        MySqlTransaction transaction,
-        string operatorCode,
-        CancellationToken cancellationToken)
-    {
-        var count = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
-            "SELECT COUNT(*) FROM operators WHERE operator_code = @operator_code;",
-            new { operator_code = operatorCode },
-            transaction,
-            cancellationToken: cancellationToken));
-
-        return count > 0;
-    }
-
     private static async Task EnsureHmiColumnsAsync(MySqlConnection connection, CancellationToken cancellationToken)
     {
         await EnsureColumnAsync(connection, "barcode_scan", "ALTER TABLE leak_test_work_records ADD COLUMN barcode_scan VARCHAR(180) NULL AFTER engine_number", cancellationToken);
         await EnsureColumnAsync(connection, "channel_no", "ALTER TABLE leak_test_work_records ADD COLUMN channel_no VARCHAR(20) NULL AFTER parameter_pressure", cancellationToken);
         await EnsureColumnAsync(connection, "press_set_up", "ALTER TABLE leak_test_work_records ADD COLUMN press_set_up DECIMAL(8, 2) NULL AFTER channel_no", cancellationToken);
         await EnsureColumnAsync(connection, "press_set_low", "ALTER TABLE leak_test_work_records ADD COLUMN press_set_low DECIMAL(8, 2) NULL AFTER press_set_up", cancellationToken);
+        await EnsureColumnAsync(connection, "operator_name", "ALTER TABLE leak_test_work_records ADD COLUMN operator_name VARCHAR(150) NULL AFTER machine_name", cancellationToken);
         await EnsureIndexAsync(connection, "ix_leak_test_work_records_barcode_scan", "CREATE INDEX ix_leak_test_work_records_barcode_scan ON leak_test_work_records (barcode_scan)", cancellationToken);
         await EnsureIndexAsync(connection, "ix_leak_test_work_records_channel_no", "CREATE INDEX ix_leak_test_work_records_channel_no ON leak_test_work_records (channel_no)", cancellationToken);
     }

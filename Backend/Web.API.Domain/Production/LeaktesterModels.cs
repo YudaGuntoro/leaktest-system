@@ -78,6 +78,81 @@ public class LeakTestParameter
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 }
 
+public class MeasurementUnit
+{
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
+
+    [JsonPropertyName("unit_category")]
+    public string UnitCategory { get; set; } = string.Empty;
+
+    [JsonPropertyName("unit_symbol")]
+    public string UnitSymbol { get; set; } = string.Empty;
+
+    [JsonPropertyName("unit_name")]
+    public string UnitName { get; set; } = string.Empty;
+
+    [JsonPropertyName("is_deleted")]
+    public bool? IsDeleted { get; set; }
+
+    [JsonPropertyName("created_at")]
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+    [JsonPropertyName("updated_at")]
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
+}
+
+public class SystemSetting
+{
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
+
+    [JsonPropertyName("pressure_unit_id")]
+    public int PressureUnitId { get; set; }
+
+    [JsonPropertyName("cycle_time_unit_id")]
+    public int CycleTimeUnitId { get; set; }
+
+    [JsonPropertyName("backup_db_location")]
+    public string? BackupDbLocation { get; set; }
+
+    [JsonPropertyName("backup_schedule")]
+    public string BackupSchedule { get; set; } = "daily";
+
+    [JsonPropertyName("plc_ip_address")]
+    public string? PlcIpAddress { get; set; }
+
+    [JsonPropertyName("created_at")]
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+    [JsonPropertyName("updated_at")]
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
+
+    [JsonIgnore]
+    public MeasurementUnit? PressureUnit { get; set; }
+
+    [JsonIgnore]
+    public MeasurementUnit? CycleTimeUnit { get; set; }
+}
+
+public class SystemSettingsResponse
+{
+    [JsonPropertyName("pressure_unit")]
+    public string PressureUnit { get; set; } = "MPa";
+
+    [JsonPropertyName("cycle_time_unit")]
+    public string CycleTimeUnit { get; set; } = "s";
+
+    [JsonPropertyName("backup_db_location")]
+    public string BackupDbLocation { get; set; } = string.Empty;
+
+    [JsonPropertyName("backup_schedule")]
+    public string BackupSchedule { get; set; } = "daily";
+
+    [JsonPropertyName("plc_ip_address")]
+    public string PlcIpAddress { get; set; } = string.Empty;
+}
+
 public class LeakTestWorkRecord
 {
     [JsonPropertyName("id")]
@@ -108,15 +183,8 @@ public class LeakTestWorkRecord
     [JsonPropertyName("machine_name")]
     public string MachineName { get; set; } = "Leak Tester Machine";
 
-    [JsonPropertyName("operator_id")]
-    public int? OperatorId { get; set; }
-
-    [NotMapped]
     [JsonPropertyName("operator_name")]
-    public string OperatorName => Operator?.OperatorName ?? string.Empty;
-
-    [JsonIgnore]
-    public Operator? Operator { get; set; }
+    public string? OperatorName { get; set; }
 
     [JsonPropertyName("parameter_pressure")]
     public decimal ParameterPressure { get; set; }
@@ -196,15 +264,8 @@ public class ReworkEngineRecord
     [JsonPropertyName("rework_time")]
     public string ReworkTime { get; set; } = DateTime.Now.ToString("HH:mm:ss");
 
-    [JsonPropertyName("operator_id")]
-    public int? OperatorId { get; set; }
-
-    [NotMapped]
     [JsonPropertyName("operator_name")]
-    public string OperatorName => Operator?.OperatorName ?? string.Empty;
-
-    [JsonIgnore]
-    public Operator? Operator { get; set; }
+    public string? OperatorName { get; set; }
 
     [JsonPropertyName("parameter_pressure")]
     public decimal ParameterPressure { get; set; }
@@ -299,6 +360,24 @@ public class CreateLeakTestParameterRequest
     public bool? IsDeleted { get; set; }
 }
 
+public class UpdateSystemSettingsRequest
+{
+    [JsonPropertyName("pressure_unit")]
+    public string PressureUnit { get; set; } = "MPa";
+
+    [JsonPropertyName("cycle_time_unit")]
+    public string CycleTimeUnit { get; set; } = "s";
+
+    [JsonPropertyName("backup_db_location")]
+    public string? BackupDbLocation { get; set; }
+
+    [JsonPropertyName("backup_schedule")]
+    public string BackupSchedule { get; set; } = "daily";
+
+    [JsonPropertyName("plc_ip_address")]
+    public string? PlcIpAddress { get; set; }
+}
+
 public class LeakTestParameterImportResult
 {
     [JsonPropertyName("imported")]
@@ -334,8 +413,8 @@ public class CreateLeakTestWorkRecordRequest
     [JsonPropertyName("machine_name")]
     public string MachineName { get; set; } = "Leak Tester Machine";
 
-    [JsonPropertyName("operator_id")]
-    public int? OperatorId { get; set; }
+    [JsonPropertyName("operator_name")]
+    public string? OperatorName { get; set; }
 
     [JsonPropertyName("parameter_pressure")]
     public decimal ParameterPressure { get; set; }
@@ -422,8 +501,8 @@ public class CreateReworkEngineRecordRequest
     [JsonPropertyName("rework_time")]
     public string ReworkTime { get; set; } = DateTime.Now.ToString("HH:mm:ss");
 
-    [JsonPropertyName("operator_id")]
-    public int? OperatorId { get; set; }
+    [JsonPropertyName("operator_name")]
+    public string? OperatorName { get; set; }
 
     [JsonPropertyName("parameter_pressure")]
     public decimal ParameterPressure { get; set; }
