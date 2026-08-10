@@ -39,9 +39,9 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
             await connection.ExecuteAsync(new CommandDefinition(
                 """
                 INSERT INTO leak_test_work_records
-                    (engine_model_id, engine_number, barcode_scan, check_date, check_time, machine_name, operator_name, parameter_pressure, channel_no, press_set_up, press_set_low, pressure_input, cycle_time_leak_test_minutes, judgement_code, judgement_name, result, created_at, updated_at)
+                    (engine_model_id, engine_number, barcode_scan, check_date, check_time, machine_name, operator_name, parameter_pressure, channel_no, press_set_up, press_set_low, pressure_input, cycle_time_leak_test_minutes, judgement_code, result, created_at, updated_at)
                 VALUES
-                    (@engine_model_id, @engine_number, @barcode_scan, @check_date, @check_time, @machine_name, @operator_name, @parameter_pressure, @channel_no, @press_set_up, @press_set_low, @pressure_input, @cycle_time, @judgement_code, @judgement_name, @result, NOW(), NOW());
+                    (@engine_model_id, @engine_number, @barcode_scan, @check_date, @check_time, @machine_name, @operator_name, @parameter_pressure, @channel_no, @press_set_up, @press_set_low, @pressure_input, @cycle_time, @judgement_code, @result, NOW(), NOW());
                 """,
                 new
                 {
@@ -59,7 +59,6 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
                     pressure_input = record.PressureInput,
                     cycle_time = record.CycleTimeLeakTestMinutes,
                     judgement_code = judgement.JudgementCode,
-                    judgement_name = DbText(judgement.JudgementName, 80),
                     result = judgement.Result
                 },
                 transaction,
@@ -142,8 +141,6 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
     {
         public int? JudgementCode { get; init; }
 
-        public string? JudgementName { get; init; }
-
         public string Result { get; init; } = string.Empty;
     }
 
@@ -159,7 +156,6 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
                 """
                 SELECT
                     judgement_code AS JudgementCode,
-                    NULLIF(judgement_name, '') AS JudgementName,
                     result AS Result
                 FROM leak_test_judgements
                 WHERE judgement_code = @judgement_code
@@ -178,7 +174,6 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
             return new LeakTestJudgementSnapshot
             {
                 JudgementCode = record.JudgementCode,
-                JudgementName = masterJudgement?.JudgementName,
                 Result = record.Result
             };
         }
@@ -198,10 +193,32 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
         await EnsureColumnAsync(connection, "press_set_low", "ALTER TABLE leak_test_work_records ADD COLUMN press_set_low DECIMAL(8, 2) NULL AFTER press_set_up", cancellationToken);
         await EnsureColumnAsync(connection, "operator_name", "ALTER TABLE leak_test_work_records ADD COLUMN operator_name VARCHAR(150) NULL AFTER machine_name", cancellationToken);
         await EnsureColumnAsync(connection, "judgement_code", "ALTER TABLE leak_test_work_records ADD COLUMN judgement_code INT NULL AFTER cycle_time_leak_test_minutes", cancellationToken);
-        await EnsureColumnAsync(connection, "judgement_name", "ALTER TABLE leak_test_work_records ADD COLUMN judgement_name VARCHAR(80) NULL AFTER judgement_code", cancellationToken);
+        await DropJudgementNameColumnAsync(connection, cancellationToken);
         await EnsureIndexAsync(connection, "ix_leak_test_work_records_barcode_scan", "CREATE INDEX ix_leak_test_work_records_barcode_scan ON leak_test_work_records (barcode_scan)", cancellationToken);
         await EnsureIndexAsync(connection, "ix_leak_test_work_records_channel_no", "CREATE INDEX ix_leak_test_work_records_channel_no ON leak_test_work_records (channel_no)", cancellationToken);
         await EnsureIndexAsync(connection, "ix_leak_test_work_records_judgement_code", "CREATE INDEX ix_leak_test_work_records_judgement_code ON leak_test_work_records (judgement_code)", cancellationToken);
+    }
+
+    private static async Task DropJudgementNameColumnAsync(MySqlConnection connection, CancellationToken cancellationToken)
+    {
+        var exists = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            """
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'leak_test_work_records'
+              AND COLUMN_NAME = 'judgement_name';
+            """,
+            cancellationToken: cancellationToken));
+
+        if (exists == 0)
+        {
+            return;
+        }
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            "ALTER TABLE leak_test_work_records DROP COLUMN judgement_name;",
+            cancellationToken: cancellationToken));
     }
 
     private static async Task EnsureJudgementMasterAsync(MySqlConnection connection, CancellationToken cancellationToken)

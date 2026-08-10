@@ -234,6 +234,7 @@ public class LeakTestWorkRecord
     [JsonPropertyName("judgement_code")]
     public int? JudgementCode { get; set; }
 
+    [NotMapped]
     [JsonPropertyName("judgement_name")]
     public string? JudgementName { get; set; }
 

@@ -1120,11 +1120,8 @@ public class LeaktesterController : ApiControllerBase
             "leak_test_work_records",
             "judgement_code",
             "ALTER TABLE leak_test_work_records ADD COLUMN judgement_code INT NULL AFTER cycle_time_leak_test_minutes");
-        await EnsureColumnAsync(
-            "leak_test_work_records",
-            "judgement_name",
-            "ALTER TABLE leak_test_work_records ADD COLUMN judgement_name VARCHAR(80) NULL AFTER judgement_code");
         await DropHistoryOperatorIdColumnsAsync();
+        await DropWorkRecordJudgementNameColumnAsync();
         await EnsureIndexAsync(
             "leak_test_work_records",
             "ix_leak_test_work_records_barcode_scan",
@@ -1237,6 +1234,23 @@ EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 SET @sql := IF(@has_rework_operator_id > 0, 'ALTER TABLE rework_engine_records DROP COLUMN operator_id', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;");
+    }
+
+    private async Task DropWorkRecordJudgementNameColumnAsync()
+    {
+        await _db.Database.ExecuteSqlRawAsync(@"
+SET @has_work_judgement_name := (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'leak_test_work_records'
+      AND COLUMN_NAME = 'judgement_name'
+);
+
+SET @sql := IF(@has_work_judgement_name > 0, 'ALTER TABLE leak_test_work_records DROP COLUMN judgement_name', 'SELECT 1');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;");
@@ -1490,6 +1504,8 @@ DEALLOCATE PREPARE stmt;");
             return;
         }
 
+        await HydrateWorkRecordJudgementsAsync(records);
+
         var parameters = await GetActiveLeakTestParametersAsync();
         foreach (var record in records)
         {
@@ -1500,6 +1516,38 @@ DEALLOCATE PREPARE stmt;");
             record.ParameterMin = context?.Min ?? (record.PressSetLow.HasValue ? FormatNormalizedPressure(record.PressSetLow.Value) : null);
             record.ParameterMax = context?.Max ?? (record.PressSetUp.HasValue ? FormatNormalizedPressure(record.PressSetUp.Value) : null);
             record.ParameterLimit = context?.Limit ?? FormatHmiPressureLimit(record.PressSetLow, record.PressSetUp);
+        }
+    }
+
+    private async Task HydrateWorkRecordJudgementsAsync(IReadOnlyCollection<LeakTestWorkRecord> records)
+    {
+        var judgementCodes = records
+            .Select(x => x.JudgementCode)
+            .Where(x => x.HasValue)
+            .Select(x => x!.Value)
+            .Distinct()
+            .ToList();
+
+        if (judgementCodes.Count == 0)
+        {
+            return;
+        }
+
+        await EnsureLeakTestJudgementTableAsync();
+        var judgementMap = await _db.LeakTestJudgements
+            .AsNoTracking()
+            .Where(x => judgementCodes.Contains(x.JudgementCode) && x.IsDeleted != true)
+            .Select(x => new { x.JudgementCode, x.JudgementName })
+            .ToDictionaryAsync(x => x.JudgementCode, x => x.JudgementName);
+
+        foreach (var record in records)
+        {
+            if (record.JudgementCode.HasValue &&
+                judgementMap.TryGetValue(record.JudgementCode.Value, out var judgementName) &&
+                !string.IsNullOrWhiteSpace(judgementName))
+            {
+                record.JudgementName = judgementName;
+            }
         }
     }
 

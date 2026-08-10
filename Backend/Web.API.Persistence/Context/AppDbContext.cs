@@ -169,7 +169,6 @@ public class AppDbContext : DbContext
             entity.Property(x => x.PressureInput).HasColumnName("pressure_input").HasPrecision(8, 2);
             entity.Property(x => x.CycleTimeLeakTestMinutes).HasColumnName("cycle_time_leak_test_minutes").HasPrecision(8, 2);
             entity.Property(x => x.JudgementCode).HasColumnName("judgement_code");
-            entity.Property(x => x.JudgementName).HasColumnName("judgement_name").HasMaxLength(80);
             entity.Property(x => x.Result).HasColumnName("result").HasMaxLength(10).IsRequired();
             entity.Property(x => x.CreatedAt).HasColumnName("created_at");
             entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
