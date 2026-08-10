@@ -5,7 +5,7 @@ import { ConfirmModal } from "@/components/ui/modal/ConfirmModal";
 import { CheckLineIcon, CopyIcon } from "@/icons";
 import { apiGet, apiRequest } from "@/lib/api";
 import { fetchSystemSettings, readSystemSettings, updateSystemSettings, type BackupSchedule, type SystemSettings } from "./settings";
-import type { LeakTestJudgement, LeakTestResult } from "./types";
+import type { LeakTestJudgement } from "./types";
 
 const inputClass = "mt-2 h-12 w-full rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-400 focus:ring-3 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500";
 const labelClass = "text-xs font-bold uppercase text-slate-600 dark:text-slate-300";
@@ -264,7 +264,7 @@ export default function SettingPage() {
           <table className="leak-rounded-header-table w-full min-w-[760px] border-separate border-spacing-0 text-left text-sm">
             <thead className="bg-transparent text-xs uppercase text-white">
               <tr>
-                <th className="w-32 rounded-l-lg bg-brand-500 px-5 py-3">Code</th>
+                <th className="w-32 rounded-l-lg bg-brand-500 px-5 py-3 text-center">Code</th>
                 <th className="bg-brand-500 px-4 py-3">Judgement Name</th>
                 <th className="w-36 bg-brand-500 px-4 py-3">Result</th>
                 <th className="bg-brand-500 px-4 py-3">Note</th>
@@ -290,7 +290,7 @@ export default function SettingPage() {
 
               {judgements.map((item) => (
                 <tr key={item.id}>
-                  <td className="border-b border-slate-100 px-3 py-3 font-black text-slate-900 dark:border-slate-800 dark:text-white">
+                  <td className="border-b border-slate-100 px-3 py-3 text-center font-black text-slate-900 dark:border-slate-800 dark:text-white">
                     {item.judgement_code}
                   </td>
                   <td className="border-b border-slate-100 px-3 py-3 dark:border-slate-800">
@@ -303,9 +303,10 @@ export default function SettingPage() {
                   <td className="border-b border-slate-100 px-3 py-3 dark:border-slate-800">
                     <select
                       className={tableInputClass}
-                      onChange={(event) => updateJudgementDraft(item.id, { result: event.target.value as LeakTestResult })}
-                      value={item.result}
+                      onChange={(event) => updateJudgementDraft(item.id, { result: event.target.value as LeakTestJudgement["result"] })}
+                      value={item.result ?? ""}
                     >
+                      <option value=""></option>
                       <option value="OK">OK</option>
                       <option value="NG">NG</option>
                     </select>

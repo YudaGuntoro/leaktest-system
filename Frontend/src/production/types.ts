@@ -42,7 +42,7 @@ export type LeakTestJudgement = {
   id: number;
   judgement_code: number;
   judgement_name: string;
-  result: LeakTestResult;
+  result: LeakTestResult | "";
   note?: string | null;
   is_deleted?: boolean | null;
   created_at: string;

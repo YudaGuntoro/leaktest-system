@@ -707,15 +707,10 @@ public class LeaktesterController : ApiControllerBase
         {
             await EnsureLeakTestJudgementTableAsync();
 
-            if (string.IsNullOrWhiteSpace(request.JudgementName))
-            {
-                throw new ArgumentException("Judgement name is required.");
-            }
-
             var result = request.Result.Trim().ToUpperInvariant();
-            if (result is not ("OK" or "NG"))
+            if (!string.IsNullOrWhiteSpace(result) && result is not ("OK" or "NG"))
             {
-                throw new ArgumentException("Result must be OK or NG.");
+                throw new ArgumentException("Result must be empty, OK, or NG.");
             }
 
             var item = await _db.LeakTestJudgements.FirstOrDefaultAsync(x => x.Id == id);
@@ -724,9 +719,9 @@ public class LeaktesterController : ApiControllerBase
                 return ApiNotFound("Judgement was not found.");
             }
 
-            item.JudgementName = TrimTo(request.JudgementName, 80);
+            item.JudgementName = string.IsNullOrWhiteSpace(request.JudgementName) ? string.Empty : TrimTo(request.JudgementName, 80);
             item.Result = result;
-            item.Note = string.IsNullOrWhiteSpace(request.Note) ? null : TrimTo(request.Note, 150);
+            item.Note = string.IsNullOrWhiteSpace(request.Note) ? string.Empty : TrimTo(request.Note, 150);
             item.IsDeleted = request.IsDeleted ?? false;
             item.UpdatedAt = DateTime.Now;
 
@@ -1836,18 +1831,23 @@ VALUES
     (3, 'UL NG', 'NG', 'HMI judgement', 0),
     (4, 'LL2 NG', 'NG', 'HMI judgement', 0),
     (5, 'UL2 NG', 'NG', 'HMI judgement', 0),
-    (6, 'ERROR', 'NG', 'HMI judgement', 0)
+    (6, 'ERROR', 'NG', 'HMI judgement', 0),
+    (7, '', '', '', 0),
+    (8, '', '', '', 0),
+    (9, '', '', '', 0),
+    (10, '', '', '', 0),
+    (11, '', '', '', 0),
+    (12, '', '', '', 0),
+    (13, '', '', '', 0),
+    (14, '', '', '', 0),
+    (15, '', '', '', 0),
+    (16, '', '', '', 0)
 ON DUPLICATE KEY UPDATE
-    judgement_name = VALUES(judgement_name),
-    result = VALUES(result),
-    note = VALUES(note),
+    result = IF(is_deleted = 1 OR judgement_name LIKE 'DUMMY-%' OR judgement_name IN ('OK', 'NG'), VALUES(result), result),
+    note = IF(is_deleted = 1 OR note LIKE 'Temporary dummy%' OR note IN ('Gateway judgement OK', 'Gateway judgement NG'), VALUES(note), note),
     is_deleted = VALUES(is_deleted),
+    judgement_name = IF(is_deleted = 1 OR judgement_name LIKE 'DUMMY-%' OR judgement_name IN ('OK', 'NG'), VALUES(judgement_name), judgement_name),
     updated_at = CURRENT_TIMESTAMP");
-
-        await _db.Database.ExecuteSqlRawAsync(@"
-UPDATE leak_test_judgements
-SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP
-WHERE judgement_code = 7");
     }
 
     private async Task SeedDefaultHmiJudgementsAsync()
@@ -1861,18 +1861,23 @@ VALUES
     (3, 'UL NG', 'NG', 'HMI judgement', 0),
     (4, 'LL2 NG', 'NG', 'HMI judgement', 0),
     (5, 'UL2 NG', 'NG', 'HMI judgement', 0),
-    (6, 'ERROR', 'NG', 'HMI judgement', 0)
+    (6, 'ERROR', 'NG', 'HMI judgement', 0),
+    (7, '', '', '', 0),
+    (8, '', '', '', 0),
+    (9, '', '', '', 0),
+    (10, '', '', '', 0),
+    (11, '', '', '', 0),
+    (12, '', '', '', 0),
+    (13, '', '', '', 0),
+    (14, '', '', '', 0),
+    (15, '', '', '', 0),
+    (16, '', '', '', 0)
 ON DUPLICATE KEY UPDATE
-    judgement_name = VALUES(judgement_name),
-    result = VALUES(result),
-    note = VALUES(note),
+    result = IF(is_deleted = 1 OR judgement_name LIKE 'DUMMY-%' OR judgement_name IN ('OK', 'NG'), VALUES(result), result),
+    note = IF(is_deleted = 1 OR note LIKE 'Temporary dummy%' OR note IN ('Gateway judgement OK', 'Gateway judgement NG'), VALUES(note), note),
     is_deleted = VALUES(is_deleted),
+    judgement_name = IF(is_deleted = 1 OR judgement_name LIKE 'DUMMY-%' OR judgement_name IN ('OK', 'NG'), VALUES(judgement_name), judgement_name),
     updated_at = CURRENT_TIMESTAMP");
-
-        await _db.Database.ExecuteSqlRawAsync(@"
-UPDATE leak_test_judgements
-SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP
-WHERE judgement_code = 7");
     }
 
     private static List<ParameterExcelRow> ReadParameterRowsFromExcel(IFormFile file)

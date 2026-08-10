@@ -125,17 +125,23 @@ VALUES
     (3, 'UL NG', 'NG', 'HMI judgement', 0),
     (4, 'LL2 NG', 'NG', 'HMI judgement', 0),
     (5, 'UL2 NG', 'NG', 'HMI judgement', 0),
-    (6, 'ERROR', 'NG', 'HMI judgement', 0)
+    (6, 'ERROR', 'NG', 'HMI judgement', 0),
+    (7, '', '', '', 0),
+    (8, '', '', '', 0),
+    (9, '', '', '', 0),
+    (10, '', '', '', 0),
+    (11, '', '', '', 0),
+    (12, '', '', '', 0),
+    (13, '', '', '', 0),
+    (14, '', '', '', 0),
+    (15, '', '', '', 0),
+    (16, '', '', '', 0)
 ON DUPLICATE KEY UPDATE
     judgement_name = VALUES(judgement_name),
     result = VALUES(result),
     note = VALUES(note),
     is_deleted = VALUES(is_deleted),
     updated_at = CURRENT_TIMESTAMP;
-
-UPDATE leak_test_judgements
-SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP
-WHERE judgement_code = 7;
 
 CREATE TABLE IF NOT EXISTS measurement_units (
     id INT AUTO_INCREMENT PRIMARY KEY,
