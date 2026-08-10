@@ -11,6 +11,7 @@ const inputClass = "mt-2 h-12 w-full rounded-lg border border-slate-300 bg-white
 const labelClass = "text-xs font-bold uppercase text-slate-600 dark:text-slate-300";
 const backupActionClass = "inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800";
 const tableInputClass = "h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-400 focus:ring-3 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500";
+type PageMessage = { kind: "ok" | "error"; text: string };
 
 export default function SettingPage() {
   const [settings, setSettings] = useState<SystemSettings>(() => readSystemSettings());
@@ -19,7 +20,7 @@ export default function SettingPage() {
   const [saving, setSaving] = useState(false);
   const [loadingJudgements, setLoadingJudgements] = useState(false);
   const [savingJudgementId, setSavingJudgementId] = useState<number | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<PageMessage | null>(null);
 
   useEffect(() => {
     let ignore = false;
@@ -46,7 +47,7 @@ export default function SettingPage() {
         }
       } catch (err) {
         if (!ignore) {
-          setMessage(err instanceof Error ? err.message : "Failed to load judgement master.");
+          setMessage({ kind: "error", text: err instanceof Error ? err.message : "Failed to load judgement master." });
         }
       } finally {
         if (!ignore) {
@@ -72,9 +73,9 @@ export default function SettingPage() {
     try {
       setSettings(await updateSystemSettings(settings));
       setIsConfirmOpen(false);
-      setMessage("Settings saved.");
+      setMessage({ kind: "ok", text: "Settings saved." });
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed to save settings.");
+      setMessage({ kind: "error", text: err instanceof Error ? err.message : "Failed to save settings." });
     } finally {
       setSaving(false);
     }
@@ -101,9 +102,9 @@ export default function SettingPage() {
       });
 
       setJudgements((current) => current.map((row) => (row.id === item.id ? updated : row)));
-      setMessage("Judgement master saved.");
+      setMessage({ kind: "ok", text: "Judgement master saved." });
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed to save judgement master.");
+      setMessage({ kind: "error", text: err instanceof Error ? err.message : "Failed to save judgement master." });
     } finally {
       setSavingJudgementId(null);
     }
@@ -113,14 +114,14 @@ export default function SettingPage() {
     try {
       const path = await navigator.clipboard.readText();
       if (!path.trim()) {
-        setMessage("Clipboard is empty. Copy a folder path first.");
+        setMessage({ kind: "error", text: "Clipboard is empty. Copy a folder path first." });
         return;
       }
 
       setSettings((current) => ({ ...current, backupDbLocation: path.trim().replace(/^"|"$/g, "") }));
       setMessage(null);
     } catch {
-      setMessage("Clipboard permission is unavailable. Paste the folder path manually.");
+      setMessage({ kind: "error", text: "Clipboard permission is unavailable. Paste the folder path manually." });
     }
   }
 
@@ -133,8 +134,14 @@ export default function SettingPage() {
       </div>
 
       {message ? (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
-          {message}
+        <div
+          className={
+            message.kind === "ok"
+              ? "rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300"
+              : "rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"
+          }
+        >
+          {message.text}
         </div>
       ) : null}
 

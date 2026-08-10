@@ -672,25 +672,32 @@ public class LeaktesterController : ApiControllerBase
     [HttpGet("judgements")]
     public async Task<IActionResult> Judgements()
     {
-        await EnsureLeakTestJudgementTableAsync();
-
-        var items = await _db.LeakTestJudgements
-            .AsNoTracking()
-            .Where(x => x.IsDeleted != true)
-            .OrderBy(x => x.JudgementCode)
-            .ToListAsync();
-
-        if (items.Count == 0)
+        try
         {
-            await SeedDefaultHmiJudgementsAsync();
-            items = await _db.LeakTestJudgements
+            await EnsureLeakTestJudgementTableAsync();
+
+            var items = await _db.LeakTestJudgements
                 .AsNoTracking()
                 .Where(x => x.IsDeleted != true)
                 .OrderBy(x => x.JudgementCode)
                 .ToListAsync();
-        }
 
-        return ApiOk(items);
+            if (items.Count == 0)
+            {
+                await SeedDefaultHmiJudgementsAsync();
+                items = await _db.LeakTestJudgements
+                    .AsNoTracking()
+                    .Where(x => x.IsDeleted != true)
+                    .OrderBy(x => x.JudgementCode)
+                    .ToListAsync();
+            }
+
+            return ApiOk(items);
+        }
+        catch (Exception ex)
+        {
+            return ApiBadRequest(ex);
+        }
     }
 
     [HttpPut("judgements/{id:int}")]

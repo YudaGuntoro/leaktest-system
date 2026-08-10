@@ -49,7 +49,16 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   });
   notifyApiActivity();
   const text = await response.text();
-  const payload = text ? (JSON.parse(text) as ApiResponse<T>) : null;
+  let payload: ApiResponse<T> | null = null;
+
+  if (text) {
+    try {
+      payload = JSON.parse(text) as ApiResponse<T>;
+    } catch {
+      const preview = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 180);
+      throw new Error(preview || `API did not return JSON. Status ${response.status}.`);
+    }
+  }
 
   if (response.status === 401) {
     clearAuthSession();
