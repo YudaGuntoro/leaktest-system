@@ -188,16 +188,16 @@ IF NOT EXIST "%ROOT_DIR%\%WORKER_SETTINGS%" (
     >> "%ROOT_DIR%\%WORKER_SETTINGS%" echo ReconnectDelaySeconds=3
     >> "%ROOT_DIR%\%WORKER_SETTINGS%" echo.
     >> "%ROOT_DIR%\%WORKER_SETTINGS%" echo [MQTT]
-    >> "%ROOT_DIR%\%WORKER_SETTINGS%" echo Host=127.0.0.1
+    >> "%ROOT_DIR%\%WORKER_SETTINGS%" echo Host=localhost
     >> "%ROOT_DIR%\%WORKER_SETTINGS%" echo Port=1883
     >> "%ROOT_DIR%\%WORKER_SETTINGS%" echo ClientId=LeakTestWorker
     >> "%ROOT_DIR%\%WORKER_SETTINGS%" echo Topic=leaktest_mqtt
-    >> "%ROOT_DIR%\%WORKER_SETTINGS%" echo Qos=2
+    >> "%ROOT_DIR%\%WORKER_SETTINGS%" echo Qos=1
     >> "%ROOT_DIR%\%WORKER_SETTINGS%" echo Username=
     >> "%ROOT_DIR%\%WORKER_SETTINGS%" echo Password=
     >> "%ROOT_DIR%\%WORKER_SETTINGS%" echo.
     >> "%ROOT_DIR%\%WORKER_SETTINGS%" echo [Database]
-    >> "%ROOT_DIR%\%WORKER_SETTINGS%" echo ConnectionString=Server=127.0.0.1;Port=3306;User ID=root;Password=YOUR_PASSWORD;Database=yanmarleaktest;SslMode=None;AllowPublicKeyRetrieval=True;
+    >> "%ROOT_DIR%\%WORKER_SETTINGS%" echo ConnectionString=Server=127.0.0.1;Port=3306;User ID=root;Password=root_native;Database=yanmarleaktest;SslMode=None;AllowPublicKeyRetrieval=True;
     >> "%ROOT_DIR%\%WORKER_SETTINGS%" echo.
     >> "%ROOT_DIR%\%WORKER_SETTINGS%" echo [Buffer]
     >> "%ROOT_DIR%\%WORKER_SETTINGS%" echo FilePath=buffer/leaktest-history-buffer.jsonl
