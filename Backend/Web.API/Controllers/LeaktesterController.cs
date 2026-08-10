@@ -1835,19 +1835,18 @@ VALUES
     (7, '', '', '', 0),
     (8, '', '', '', 0),
     (9, '', '', '', 0),
-    (10, '', '', '', 0),
-    (11, '', '', '', 0),
-    (12, '', '', '', 0),
-    (13, '', '', '', 0),
-    (14, '', '', '', 0),
-    (15, '', '', '', 0),
-    (16, '', '', '', 0)
+    (10, '', '', '', 0)
 ON DUPLICATE KEY UPDATE
     result = IF(is_deleted = 1 OR judgement_name LIKE 'DUMMY-%' OR judgement_name IN ('OK', 'NG'), VALUES(result), result),
     note = IF(is_deleted = 1 OR note LIKE 'Temporary dummy%' OR note IN ('Gateway judgement OK', 'Gateway judgement NG'), VALUES(note), note),
     is_deleted = VALUES(is_deleted),
     judgement_name = IF(is_deleted = 1 OR judgement_name LIKE 'DUMMY-%' OR judgement_name IN ('OK', 'NG'), VALUES(judgement_name), judgement_name),
     updated_at = CURRENT_TIMESTAMP");
+
+        await _db.Database.ExecuteSqlRawAsync(@"
+UPDATE leak_test_judgements
+SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP
+WHERE judgement_code > 10");
     }
 
     private async Task SeedDefaultHmiJudgementsAsync()
@@ -1865,19 +1864,18 @@ VALUES
     (7, '', '', '', 0),
     (8, '', '', '', 0),
     (9, '', '', '', 0),
-    (10, '', '', '', 0),
-    (11, '', '', '', 0),
-    (12, '', '', '', 0),
-    (13, '', '', '', 0),
-    (14, '', '', '', 0),
-    (15, '', '', '', 0),
-    (16, '', '', '', 0)
+    (10, '', '', '', 0)
 ON DUPLICATE KEY UPDATE
     result = IF(is_deleted = 1 OR judgement_name LIKE 'DUMMY-%' OR judgement_name IN ('OK', 'NG'), VALUES(result), result),
     note = IF(is_deleted = 1 OR note LIKE 'Temporary dummy%' OR note IN ('Gateway judgement OK', 'Gateway judgement NG'), VALUES(note), note),
     is_deleted = VALUES(is_deleted),
     judgement_name = IF(is_deleted = 1 OR judgement_name LIKE 'DUMMY-%' OR judgement_name IN ('OK', 'NG'), VALUES(judgement_name), judgement_name),
     updated_at = CURRENT_TIMESTAMP");
+
+        await _db.Database.ExecuteSqlRawAsync(@"
+UPDATE leak_test_judgements
+SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP
+WHERE judgement_code > 10");
     }
 
     private static List<ParameterExcelRow> ReadParameterRowsFromExcel(IFormFile file)

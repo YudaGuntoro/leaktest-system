@@ -1,4 +1,4 @@
--- Extend judgement master to 16 HMI codes.
+-- Limit judgement master to 10 active HMI codes.
 
 INSERT INTO leak_test_judgements
     (judgement_code, judgement_name, result, note, is_deleted)
@@ -12,16 +12,14 @@ VALUES
     (7, '', '', '', 0),
     (8, '', '', '', 0),
     (9, '', '', '', 0),
-    (10, '', '', '', 0),
-    (11, '', '', '', 0),
-    (12, '', '', '', 0),
-    (13, '', '', '', 0),
-    (14, '', '', '', 0),
-    (15, '', '', '', 0),
-    (16, '', '', '', 0)
+    (10, '', '', '', 0)
 ON DUPLICATE KEY UPDATE
     judgement_name = VALUES(judgement_name),
     result = VALUES(result),
     note = VALUES(note),
     is_deleted = VALUES(is_deleted),
     updated_at = CURRENT_TIMESTAMP;
+
+UPDATE leak_test_judgements
+SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP
+WHERE judgement_code > 10;
