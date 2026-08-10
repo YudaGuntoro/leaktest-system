@@ -75,7 +75,6 @@ echo.
 echo Stopping old services if registered...
 CALL :StopServiceIfExists "LeakTestWorker"
 CALL :StopServiceIfExists "LeakTestMqttBroker"
-CALL :StopServiceIfExists "Web.API"
 
 echo.
 echo Publishing backend API...
@@ -120,14 +119,11 @@ CALL :InstallService "LeakTestMqttBroker" "Leak Test MQTT Broker" "PT. Yanmar Le
 IF ERRORLEVEL 1 GOTO Failed
 CALL :InstallService "LeakTestWorker" "Leak Test Worker" "PT. Yanmar Leak Test MQTT Worker" "%ROOT_DIR%\%WORKER_PUBLISH%\LeakTestWorker.exe"
 IF ERRORLEVEL 1 GOTO Failed
-CALL :InstallService "Web.API" "Leak Test Web API" "PT. Yanmar Leak Test Web API Service" "%ROOT_DIR%\%API_PUBLISH%\Web.API.exe"
-IF ERRORLEVEL 1 GOTO Failed
 
 echo.
 echo Starting services...
 CALL :StartService "LeakTestMqttBroker"
 CALL :StartService "LeakTestWorker"
-CALL :StartService "Web.API"
 
 echo.
 echo ============================================================
@@ -135,7 +131,8 @@ echo Pull and install completed successfully.
 echo Services:
 echo   - LeakTestMqttBroker
 echo   - LeakTestWorker
-echo   - Web.API
+echo API has been published for IIS:
+echo   %API_PUBLISH%
 echo Frontend has been built. Run frontend with: cd Frontend ^&^& npm run start
 echo Backup folder: %BACKUP_DIR%
 echo ============================================================

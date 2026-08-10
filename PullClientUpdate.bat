@@ -74,7 +74,6 @@ CALL :EnsureDefaultSettings
 IF "%IS_ADMIN%"=="1" (
     echo.
     echo Stopping registered services before publish...
-    CALL :StopServiceIfExists "Web.API"
     CALL :StopServiceIfExists "LeakTestWorker"
     CALL :StopServiceIfExists "LeakTestMqttBroker"
 )
@@ -121,7 +120,6 @@ IF "%IS_ADMIN%"=="1" (
     echo Starting registered services...
     CALL :StartServiceIfExists "LeakTestMqttBroker"
     CALL :StartServiceIfExists "LeakTestWorker"
-    CALL :StartServiceIfExists "Web.API"
 )
 
 echo.
