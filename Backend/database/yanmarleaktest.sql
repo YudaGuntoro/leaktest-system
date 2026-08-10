@@ -76,3 +76,4 @@ SOURCE Backend/Web.API.Persistence/Migrations/20260810_003_drop_history_operator
 SOURCE Backend/Web.API.Persistence/Migrations/20260810_004_plc_ip_setting.sql;
 SOURCE Backend/Web.API.Persistence/Migrations/20260810_005_leak_test_judgements.sql;
 SOURCE Backend/Web.API.Persistence/Migrations/20260810_006_hmi_judgement_values.sql;
+SOURCE Backend/Web.API.Persistence/Migrations/20260810_007_activate_hmi_judgement_master.sql;

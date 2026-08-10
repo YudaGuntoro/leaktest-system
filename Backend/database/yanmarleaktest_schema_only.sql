@@ -135,8 +135,7 @@ ON DUPLICATE KEY UPDATE
 
 UPDATE leak_test_judgements
 SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP
-WHERE judgement_code = 7
-  AND judgement_name = 'DUMMY-7';
+WHERE judgement_code = 7;
 
 CREATE TABLE IF NOT EXISTS measurement_units (
     id INT AUTO_INCREMENT PRIMARY KEY,

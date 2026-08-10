@@ -207,10 +207,10 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
                 (5, 'UL2 NG', 'NG', 'HMI judgement', 0),
                 (6, 'ERROR', 'NG', 'HMI judgement', 0)
             ON DUPLICATE KEY UPDATE
-                result = IF(judgement_name LIKE 'DUMMY-%' OR judgement_name IN ('OK', 'NG'), VALUES(result), result),
-                note = IF(note LIKE 'Temporary dummy%' OR note IN ('Gateway judgement OK', 'Gateway judgement NG'), VALUES(note), note),
-                is_deleted = IF(judgement_name LIKE 'DUMMY-%' OR judgement_name IN ('OK', 'NG'), VALUES(is_deleted), is_deleted),
-                judgement_name = IF(judgement_name LIKE 'DUMMY-%' OR judgement_name IN ('OK', 'NG'), VALUES(judgement_name), judgement_name),
+                judgement_name = VALUES(judgement_name),
+                result = VALUES(result),
+                note = VALUES(note),
+                is_deleted = VALUES(is_deleted),
                 updated_at = CURRENT_TIMESTAMP;
             """,
             cancellationToken: cancellationToken));
@@ -219,8 +219,7 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
             """
             UPDATE leak_test_judgements
             SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP
-            WHERE judgement_code = 7
-              AND judgement_name = 'DUMMY-7';
+            WHERE judgement_code = 7;
             """,
             cancellationToken: cancellationToken));
     }

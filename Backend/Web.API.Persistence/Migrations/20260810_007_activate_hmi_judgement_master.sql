@@ -1,4 +1,4 @@
--- Update judgement master values from HMI.
+-- Force activate HMI judgement master values.
 
 INSERT INTO leak_test_judgements
     (judgement_code, judgement_name, result, note, is_deleted)
