@@ -12,6 +12,13 @@ SET "PORT=3000"
 IF NOT "%~1"=="" SET "BRANCH=%~1"
 IF NOT "%~2"=="" SET "PORT=%~2"
 
+IF EXIST "%ROOT_DIR%\package.json" (
+    SET "FRONTEND_DIR=%ROOT_DIR%"
+    SET "PROJECT_ROOT=%ROOT_DIR%\.."
+) ELSE (
+    SET "PROJECT_ROOT=%ROOT_DIR%"
+)
+
 echo ============================================================
 echo LeakTester Frontend Only
 echo Root: %ROOT_DIR%
@@ -31,7 +38,9 @@ IF NOT EXIST "%FRONTEND_DIR%\package.json" (
     echo ERROR: Frontend package.json was not found:
     echo %FRONTEND_DIR%\package.json
     echo.
-    echo Run this BAT from the project root that contains the Frontend folder.
+    echo Put this BAT in either:
+    echo   1. Project root that contains the Frontend folder, or
+    echo   2. The actual Frontend folder that contains package.json.
     GOTO Failed
 )
 
@@ -47,9 +56,11 @@ IF ERRORLEVEL 1 (
     echo.
     echo WARNING: git is not available in PATH. Skipping git pull.
 ) ELSE (
-    IF EXIST "%ROOT_DIR%\.git" (
+    IF EXIST "%PROJECT_ROOT%\.git" (
         echo.
         echo Pulling latest source from GitHub...
+        cd /d "%PROJECT_ROOT%"
+        IF ERRORLEVEL 1 GOTO Failed
         git fetch "%REMOTE%" "%BRANCH%"
         IF ERRORLEVEL 1 GOTO Failed
 
