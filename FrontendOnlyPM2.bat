@@ -102,7 +102,7 @@ IF NOT ERRORLEVEL 1 (
 
 SET "NODE_ENV=production"
 SET "PORT=%PORT%"
-pm2 start npm --name "%PM2_APP_NAME%" -- run start
+pm2 start "node_modules\next\dist\bin\next" --name "%PM2_APP_NAME%" -- start -p "%PORT%"
 IF ERRORLEVEL 1 GOTO Failed
 
 pm2 save
