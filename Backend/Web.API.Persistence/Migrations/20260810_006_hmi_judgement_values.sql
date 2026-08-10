@@ -1,17 +1,4 @@
--- Leaktester Work Record - judgement master data.
-
-CREATE TABLE IF NOT EXISTS leak_test_judgements (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    judgement_code INT NOT NULL,
-    judgement_name VARCHAR(80) NOT NULL,
-    result VARCHAR(10) NOT NULL,
-    note VARCHAR(150) NULL,
-    is_deleted TINYINT(1) NOT NULL DEFAULT 0,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_leak_test_judgements_code (judgement_code),
-    KEY ix_leak_test_judgements_result (result)
-);
+-- Update judgement master values from HMI.
 
 INSERT INTO leak_test_judgements
     (judgement_code, judgement_name, result, note, is_deleted)

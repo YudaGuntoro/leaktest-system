@@ -33,6 +33,7 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
         try
         {
             var engineModelId = await ResolveEngineModelIdAsync(connection, transaction, record, cancellationToken);
+            var result = await ResolveJudgementResultAsync(connection, transaction, record, cancellationToken);
             var barcodeScan = FirstText(record.BarcodeScan, BuildBarcodeScan(record.EngineModel, record.EngineNumber));
 
             await connection.ExecuteAsync(new CommandDefinition(
@@ -57,7 +58,7 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
                     press_set_low = record.PressSetLow,
                     pressure_input = record.PressureInput,
                     cycle_time = record.CycleTimeLeakTestMinutes,
-                    result = record.Result
+                    result
                 },
                 transaction,
                 cancellationToken: cancellationToken));
@@ -135,6 +136,35 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
             cancellationToken: cancellationToken));
     }
 
+    private static async Task<string> ResolveJudgementResultAsync(
+        MySqlConnection connection,
+        MySqlTransaction transaction,
+        LeakTestHistoryRecord record,
+        CancellationToken cancellationToken)
+    {
+        if (record.JudgementCode.HasValue)
+        {
+            var masterResult = await connection.ExecuteScalarAsync<string?>(new CommandDefinition(
+                """
+                SELECT result
+                FROM leak_test_judgements
+                WHERE judgement_code = @judgement_code
+                  AND is_deleted <> 1
+                LIMIT 1;
+                """,
+                new { judgement_code = record.JudgementCode.Value },
+                transaction,
+                cancellationToken: cancellationToken));
+
+            if (masterResult is "OK" or "NG")
+            {
+                return masterResult;
+            }
+        }
+
+        return record.Result;
+    }
+
     private static async Task EnsureHmiColumnsAsync(MySqlConnection connection, CancellationToken cancellationToken)
     {
         await EnsureColumnAsync(connection, "barcode_scan", "ALTER TABLE leak_test_work_records ADD COLUMN barcode_scan VARCHAR(180) NULL AFTER engine_number", cancellationToken);
@@ -170,19 +200,27 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
             INSERT INTO leak_test_judgements
                 (judgement_code, judgement_name, result, note, is_deleted)
             VALUES
-                (1, 'DUMMY-1', 'NG', 'Temporary dummy judgement', 0),
-                (2, 'OK', 'OK', 'Gateway judgement OK', 0),
-                (3, 'DUMMY-3', 'NG', 'Temporary dummy judgement', 0),
-                (4, 'NG', 'NG', 'Gateway judgement NG', 0),
-                (5, 'DUMMY-5', 'NG', 'Temporary dummy judgement', 0),
-                (6, 'DUMMY-6', 'NG', 'Temporary dummy judgement', 0),
-                (7, 'DUMMY-7', 'NG', 'Temporary dummy judgement', 0)
+                (1, 'LL NG', 'NG', 'HMI judgement', 0),
+                (2, 'PASS', 'OK', 'HMI judgement', 0),
+                (3, 'UL NG', 'NG', 'HMI judgement', 0),
+                (4, 'LL2 NG', 'NG', 'HMI judgement', 0),
+                (5, 'UL2 NG', 'NG', 'HMI judgement', 0),
+                (6, 'ERROR', 'NG', 'HMI judgement', 0)
             ON DUPLICATE KEY UPDATE
-                judgement_name = VALUES(judgement_name),
-                result = VALUES(result),
-                note = VALUES(note),
-                is_deleted = VALUES(is_deleted),
+                result = IF(judgement_name LIKE 'DUMMY-%' OR judgement_name IN ('OK', 'NG'), VALUES(result), result),
+                note = IF(note LIKE 'Temporary dummy%' OR note IN ('Gateway judgement OK', 'Gateway judgement NG'), VALUES(note), note),
+                is_deleted = IF(judgement_name LIKE 'DUMMY-%' OR judgement_name IN ('OK', 'NG'), VALUES(is_deleted), is_deleted),
+                judgement_name = IF(judgement_name LIKE 'DUMMY-%' OR judgement_name IN ('OK', 'NG'), VALUES(judgement_name), judgement_name),
                 updated_at = CURRENT_TIMESTAMP;
+            """,
+            cancellationToken: cancellationToken));
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            """
+            UPDATE leak_test_judgements
+            SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP
+            WHERE judgement_code = 7
+              AND judgement_name = 'DUMMY-7';
             """,
             cancellationToken: cancellationToken));
     }

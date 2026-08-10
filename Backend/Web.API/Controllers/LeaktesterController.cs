@@ -60,6 +60,7 @@ public class LeaktesterController : ApiControllerBase
         try
         {
             await EnsureLeakTestWorkRecordHmiColumnsAsync();
+            await EnsureLeakTestJudgementTableAsync();
 
             var records = await WorkRecordQuery(date, dateFrom, dateTo, engineModel, engineNumber, barcodeScan, result)
                 .OrderByDescending(x => x.CheckDate)
@@ -281,7 +282,7 @@ public class LeaktesterController : ApiControllerBase
                 throw new ArgumentException("Press set low/up is required from HMI payload.");
             }
 
-            var result = NormalizeResult(request.Judgement);
+            var result = await ResolveJudgementResultAsync(request.Judgement);
             if (result is null)
             {
                 throw new ArgumentException("Judgement must be OK or NG.");
@@ -1425,6 +1426,25 @@ DEALLOCATE PREPARE stmt;");
         };
     }
 
+    private async Task<string?> ResolveJudgementResultAsync(string? value)
+    {
+        if (int.TryParse(value?.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var judgementCode))
+        {
+            var masterResult = await _db.LeakTestJudgements
+                .AsNoTracking()
+                .Where(x => x.JudgementCode == judgementCode && x.IsDeleted != true)
+                .Select(x => x.Result)
+                .FirstOrDefaultAsync();
+
+            if (masterResult is "OK" or "NG")
+            {
+                return masterResult;
+            }
+        }
+
+        return NormalizeResult(value);
+    }
+
     private async Task HydrateWorkRecordParameterContextAsync(IReadOnlyCollection<LeakTestWorkRecord> records)
     {
         if (records.Count == 0)
@@ -1792,19 +1812,24 @@ CREATE TABLE IF NOT EXISTS leak_test_judgements (
 INSERT INTO leak_test_judgements
     (judgement_code, judgement_name, result, note, is_deleted)
 VALUES
-    (1, 'DUMMY-1', 'NG', 'Temporary dummy judgement', 0),
-    (2, 'OK', 'OK', 'Gateway judgement OK', 0),
-    (3, 'DUMMY-3', 'NG', 'Temporary dummy judgement', 0),
-    (4, 'NG', 'NG', 'Gateway judgement NG', 0),
-    (5, 'DUMMY-5', 'NG', 'Temporary dummy judgement', 0),
-    (6, 'DUMMY-6', 'NG', 'Temporary dummy judgement', 0),
-    (7, 'DUMMY-7', 'NG', 'Temporary dummy judgement', 0)
+    (1, 'LL NG', 'NG', 'HMI judgement', 0),
+    (2, 'PASS', 'OK', 'HMI judgement', 0),
+    (3, 'UL NG', 'NG', 'HMI judgement', 0),
+    (4, 'LL2 NG', 'NG', 'HMI judgement', 0),
+    (5, 'UL2 NG', 'NG', 'HMI judgement', 0),
+    (6, 'ERROR', 'NG', 'HMI judgement', 0)
 ON DUPLICATE KEY UPDATE
-    judgement_name = VALUES(judgement_name),
-    result = VALUES(result),
-    note = VALUES(note),
-    is_deleted = VALUES(is_deleted),
+    result = IF(judgement_name LIKE 'DUMMY-%' OR judgement_name IN ('OK', 'NG'), VALUES(result), result),
+    note = IF(note LIKE 'Temporary dummy%' OR note IN ('Gateway judgement OK', 'Gateway judgement NG'), VALUES(note), note),
+    is_deleted = IF(judgement_name LIKE 'DUMMY-%' OR judgement_name IN ('OK', 'NG'), VALUES(is_deleted), is_deleted),
+    judgement_name = IF(judgement_name LIKE 'DUMMY-%' OR judgement_name IN ('OK', 'NG'), VALUES(judgement_name), judgement_name),
     updated_at = CURRENT_TIMESTAMP");
+
+        await _db.Database.ExecuteSqlRawAsync(@"
+UPDATE leak_test_judgements
+SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP
+WHERE judgement_code = 7
+  AND judgement_name = 'DUMMY-7'");
     }
 
     private static List<ParameterExcelRow> ReadParameterRowsFromExcel(IFormFile file)
