@@ -282,8 +282,8 @@ public class LeaktesterController : ApiControllerBase
                 throw new ArgumentException("Press set low/up is required from HMI payload.");
             }
 
-            var result = await ResolveJudgementResultAsync(request.Judgement);
-            if (result is null)
+            var judgement = await ResolveJudgementSnapshotAsync(request.Judgement);
+            if (judgement.Result is null)
             {
                 throw new ArgumentException("Judgement must be OK or NG.");
             }
@@ -308,7 +308,9 @@ public class LeaktesterController : ApiControllerBase
                 PressSetLow = request.PressSetLow,
                 PressureInput = request.PressureInput,
                 CycleTimeLeakTestMinutes = request.CycleTime,
-                Result = result,
+                JudgementCode = judgement.JudgementCode,
+                JudgementName = judgement.JudgementName,
+                Result = judgement.Result,
                 CreatedAt = DateTime.Now,
                 UpdatedAt = DateTime.Now
             };
@@ -1114,6 +1116,14 @@ public class LeaktesterController : ApiControllerBase
             "leak_test_work_records",
             "operator_name",
             "ALTER TABLE leak_test_work_records ADD COLUMN operator_name VARCHAR(150) NULL AFTER machine_name");
+        await EnsureColumnAsync(
+            "leak_test_work_records",
+            "judgement_code",
+            "ALTER TABLE leak_test_work_records ADD COLUMN judgement_code INT NULL AFTER cycle_time_leak_test_minutes");
+        await EnsureColumnAsync(
+            "leak_test_work_records",
+            "judgement_name",
+            "ALTER TABLE leak_test_work_records ADD COLUMN judgement_name VARCHAR(80) NULL AFTER judgement_code");
         await DropHistoryOperatorIdColumnsAsync();
         await EnsureIndexAsync(
             "leak_test_work_records",
@@ -1123,6 +1133,10 @@ public class LeaktesterController : ApiControllerBase
             "leak_test_work_records",
             "ix_leak_test_work_records_channel_no",
             "CREATE INDEX ix_leak_test_work_records_channel_no ON leak_test_work_records (channel_no)");
+        await EnsureIndexAsync(
+            "leak_test_work_records",
+            "ix_leak_test_work_records_judgement_code",
+            "CREATE INDEX ix_leak_test_work_records_judgement_code ON leak_test_work_records (judgement_code)");
     }
 
     private async Task EnsureReworkEngineRecordOperatorSnapshotColumnAsync()
@@ -1440,23 +1454,33 @@ DEALLOCATE PREPARE stmt;");
         };
     }
 
-    private async Task<string?> ResolveJudgementResultAsync(string? value)
+    private sealed record LeakTestJudgementSnapshot(int? JudgementCode, string? JudgementName, string? Result);
+
+    private async Task<LeakTestJudgementSnapshot> ResolveJudgementSnapshotAsync(string? value)
     {
         if (int.TryParse(value?.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var judgementCode))
         {
-            var masterResult = await _db.LeakTestJudgements
+            var masterJudgement = await _db.LeakTestJudgements
                 .AsNoTracking()
                 .Where(x => x.JudgementCode == judgementCode && x.IsDeleted != true)
-                .Select(x => x.Result)
+                .Select(x => new { x.JudgementCode, x.JudgementName, x.Result })
                 .FirstOrDefaultAsync();
 
-            if (masterResult is "OK" or "NG")
+            if (masterJudgement?.Result is "OK" or "NG")
             {
-                return masterResult;
+                return new LeakTestJudgementSnapshot(
+                    masterJudgement.JudgementCode,
+                    string.IsNullOrWhiteSpace(masterJudgement.JudgementName) ? null : masterJudgement.JudgementName,
+                    masterJudgement.Result);
             }
+
+            return new LeakTestJudgementSnapshot(
+                judgementCode,
+                string.IsNullOrWhiteSpace(masterJudgement?.JudgementName) ? null : masterJudgement.JudgementName,
+                NormalizeResult(value));
         }
 
-        return NormalizeResult(value);
+        return new LeakTestJudgementSnapshot(null, null, NormalizeResult(value));
     }
 
     private async Task HydrateWorkRecordParameterContextAsync(IReadOnlyCollection<LeakTestWorkRecord> records)

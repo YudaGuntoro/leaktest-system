@@ -231,6 +231,12 @@ public class LeakTestWorkRecord
     [JsonPropertyName("cycle_time_leak_test_minutes")]
     public decimal CycleTimeLeakTestMinutes { get; set; }
 
+    [JsonPropertyName("judgement_code")]
+    public int? JudgementCode { get; set; }
+
+    [JsonPropertyName("judgement_name")]
+    public string? JudgementName { get; set; }
+
     [NotMapped]
     [JsonPropertyName("parameter_channel_no")]
     public string? ParameterChannelNo { get; set; }

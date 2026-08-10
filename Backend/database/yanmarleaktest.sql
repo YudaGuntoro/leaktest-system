@@ -78,3 +78,4 @@ SOURCE Backend/Web.API.Persistence/Migrations/20260810_005_leak_test_judgements.
 SOURCE Backend/Web.API.Persistence/Migrations/20260810_006_hmi_judgement_values.sql;
 SOURCE Backend/Web.API.Persistence/Migrations/20260810_007_activate_hmi_judgement_master.sql;
 SOURCE Backend/Web.API.Persistence/Migrations/20260810_008_limit_judgement_master_codes.sql;
+SOURCE Backend/Web.API.Persistence/Migrations/20260810_009_work_record_judgement_snapshot.sql;

@@ -212,12 +212,15 @@ CREATE TABLE IF NOT EXISTS leak_test_work_records (
     press_set_low DECIMAL(8, 2) NULL,
     pressure_input DECIMAL(8, 2) NOT NULL,
     cycle_time_leak_test_minutes DECIMAL(8, 2) NOT NULL,
+    judgement_code INT NULL,
+    judgement_name VARCHAR(80) NULL,
     result VARCHAR(10) NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     KEY ix_leak_test_work_records_date_engine (check_date, engine_number),
     KEY ix_leak_test_work_records_barcode_scan (barcode_scan),
     KEY ix_leak_test_work_records_channel_no (channel_no),
+    KEY ix_leak_test_work_records_judgement_code (judgement_code),
     KEY ix_leak_test_work_records_engine_model_id (engine_model_id),
     CONSTRAINT fk_leak_test_work_records_engine_model
         FOREIGN KEY (engine_model_id) REFERENCES engine_models (id)

@@ -65,6 +65,8 @@ export type LeakTestWorkRecord = {
   press_set_low?: number | null;
   pressure_input: number;
   cycle_time_leak_test_minutes: number;
+  judgement_code?: number | null;
+  judgement_name?: string | null;
   parameter_channel_no?: string | null;
   parameter_standard?: string | null;
   parameter_min?: string | null;

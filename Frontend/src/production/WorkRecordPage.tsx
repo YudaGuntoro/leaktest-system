@@ -45,6 +45,17 @@ function displayOptional(value?: string | null) {
   return value && value.trim() ? value : "-";
 }
 
+function displayJudgement(record: LeakTestWorkRecord) {
+  const code = record.judgement_code ?? null;
+  const name = displayOptional(record.judgement_name);
+
+  if (code === null) {
+    return name;
+  }
+
+  return name === "-" ? String(code) : `${code} - ${name}`;
+}
+
 function pressureInputStateClass(result: LeakTestResult) {
   return result === "OK"
     ? "border-emerald-400/70 bg-emerald-50 text-emerald-700 dark:border-emerald-400/70 dark:bg-emerald-500/10 dark:text-emerald-300"
@@ -539,7 +550,7 @@ export default function WorkRecordPage() {
         </div>
 
         <div className="overflow-x-auto px-3 pb-3 pt-3">
-          <table className="leak-rounded-header-table w-full min-w-[1260px] border-separate border-spacing-0 text-left text-sm">
+          <table className="leak-rounded-header-table w-full min-w-[1360px] border-separate border-spacing-0 text-left text-sm">
             <thead className="bg-transparent text-xs uppercase text-white">
               <tr className="bg-transparent">
                 <th className="rounded-l-lg bg-brand-500 px-5 py-3">Engine Model</th>
@@ -552,6 +563,7 @@ export default function WorkRecordPage() {
                 <th className="bg-brand-500 px-4 py-3">Pressure Limit (TP LL ~ TP UL) ({pressureUnit})</th>
                 <th className="bg-brand-500 px-4 py-3">Pressure Input ({pressureUnit})</th>
                 <th className="bg-brand-500 px-4 py-3">Cycle Time ({cycleTimeUnit})</th>
+                <th className="bg-brand-500 px-4 py-3">Judgement</th>
                 <th className="rounded-r-lg bg-brand-500 px-5 py-3">Result</th>
               </tr>
             </thead>
@@ -587,6 +599,7 @@ export default function WorkRecordPage() {
                       </span>
                     </td>
                     <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{record.cycle_time_leak_test_minutes}</td>
+                    <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{displayJudgement(record)}</td>
                     <td className="px-5 py-4">
                       <span className={`rounded-full px-3 py-1 text-xs font-black ${record.result === "OK" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300" : "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300"}`}>
                         {record.result}
@@ -673,6 +686,7 @@ export default function WorkRecordPage() {
                 valueClassName={pressureInputTextClass(selectedRecord.result)}
               />
               <DetailItem label={`Cycle Time (${cycleTimeUnit})`} value={selectedRecord.cycle_time_leak_test_minutes} />
+              <DetailItem label="Judgement" value={displayJudgement(selectedRecord)} />
               <DetailItem
                 label="Result"
                 value={

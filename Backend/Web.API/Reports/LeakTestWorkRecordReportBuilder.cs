@@ -63,7 +63,7 @@ public static class LeakTestWorkRecordReportBuilder
         SetLabelRow(worksheet, 17, "Parameter Range (TP LL ~ TP UL)", record.ParameterLimit ?? "-");
         SetLabelRow(worksheet, 18, "Pressure Input (Result)", FormatPressure(record.PressureInput));
         SetLabelRow(worksheet, 19, "Cycle Time", FormatMinutes(record.CycleTimeLeakTestMinutes));
-        SetLabelRow(worksheet, 20, "Judgement", $"{record.Result} (by Cosmo)");
+        SetLabelRow(worksheet, 20, "Judgement", FormatJudgement(record));
 
         SetLabelRow(worksheet, 23, "Created At", FormatDateTime(record.CreatedAt));
         SetLabelRow(worksheet, 24, "Updated At", FormatDateTime(record.UpdatedAt));
@@ -300,6 +300,20 @@ public static class LeakTestWorkRecordReportBuilder
 
     private static string FormatMinutes(decimal value) =>
         $"{value.ToString("0.##", ReportCulture)} menit";
+
+    private static string FormatJudgement(LeakTestWorkRecord record)
+    {
+        if (!record.JudgementCode.HasValue)
+        {
+            return string.IsNullOrWhiteSpace(record.JudgementName)
+                ? $"{record.Result} (by Cosmo)"
+                : $"{record.JudgementName} ({record.Result})";
+        }
+
+        return string.IsNullOrWhiteSpace(record.JudgementName)
+            ? $"{record.JudgementCode.Value.ToString(ReportCulture)} ({record.Result})"
+            : $"{record.JudgementCode.Value.ToString(ReportCulture)} - {record.JudgementName} ({record.Result})";
+    }
 
     private static string FormatDate(DateTime value) =>
         value.ToString("dd MMM yyyy", ReportCulture);
