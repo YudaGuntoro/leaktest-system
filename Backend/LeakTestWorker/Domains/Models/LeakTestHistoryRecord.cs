@@ -31,6 +31,4 @@ public sealed class LeakTestHistoryRecord
     public decimal CycleTimeLeakTestMinutes { get; init; }
 
     public int? JudgementCode { get; init; }
-
-    public string Result { get; init; } = string.Empty;
 }

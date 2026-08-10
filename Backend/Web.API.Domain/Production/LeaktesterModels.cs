@@ -258,6 +258,7 @@ public class LeakTestWorkRecord
     [JsonPropertyName("parameter_limit")]
     public string? ParameterLimit { get; set; }
 
+    [NotMapped]
     [JsonPropertyName("result")]
     public string Result { get; set; } = "OK";
 
@@ -483,8 +484,6 @@ public class CreateLeakTestWorkRecordRequest
     [JsonPropertyName("cycle_time_leak_test_minutes")]
     public decimal CycleTimeLeakTestMinutes { get; set; }
 
-    [JsonPropertyName("result")]
-    public string Result { get; set; } = "OK";
 }
 
 public class CreateHmiLeakTestWorkRecordRequest

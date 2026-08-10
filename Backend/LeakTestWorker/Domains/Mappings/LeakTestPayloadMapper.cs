@@ -84,8 +84,7 @@ public static class LeakTestPayloadMapper
             PressSetLow = pressSetLow,
             PressureInput = NormalizeCosmoPressure(ReadDecimal(message.Data, "pressure_input", "pressureInput", "PressureInput", "press_input", "actual_pressure", "ActualPressure", "leak_pressure", "LeakPressure") ?? 0),
             CycleTimeLeakTestMinutes = ReadCycleTime(message.Data) ?? 0,
-            JudgementCode = judgementCode,
-            Result = NormalizeResult(ReadString(message.Data, "result", "Result", "judgement", "Judgement", "status", "Status")) ?? string.Empty
+            JudgementCode = judgementCode
         };
 
         Validate(record);
@@ -244,21 +243,6 @@ public static class LeakTestPayloadMapper
         return value.Length > 8 ? value[..8] : value;
     }
 
-    private static string? NormalizeResult(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
-        return value.Trim().ToUpperInvariant() switch
-        {
-            "OK" or "PASS" or "PASSED" or "TRUE" or "2" => "OK",
-            "NG" or "NOK" or "FAIL" or "FAILED" or "FALSE" or "0" or "1" or "3" or "4" or "5" or "6" or "7" => "NG",
-            _ => null
-        };
-    }
-
     private static decimal? CalculateParameterPressure(decimal? pressSetLow, decimal? pressSetUp)
     {
         if (pressSetLow.HasValue && pressSetUp.HasValue)
@@ -306,11 +290,6 @@ public static class LeakTestPayloadMapper
         if (record.CycleTimeLeakTestMinutes <= 0)
         {
             missingFields.Add("cycle_time_leak_test_minutes");
-        }
-
-        if (record.Result is not ("OK" or "NG"))
-        {
-            missingFields.Add("result");
         }
 
         if (missingFields.Count > 0)

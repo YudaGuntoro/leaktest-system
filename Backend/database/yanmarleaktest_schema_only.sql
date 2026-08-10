@@ -213,7 +213,6 @@ CREATE TABLE IF NOT EXISTS leak_test_work_records (
     pressure_input DECIMAL(8, 2) NOT NULL,
     cycle_time_leak_test_minutes DECIMAL(8, 2) NOT NULL,
     judgement_code INT NULL,
-    result VARCHAR(10) NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     KEY ix_leak_test_work_records_date_engine (check_date, engine_number),

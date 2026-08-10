@@ -35,15 +35,14 @@ public class LeaktesterController : ApiControllerBase
     {
         await EnsureLeakTestWorkRecordHmiColumnsAsync();
 
-        var records = await WorkRecordQuery(date, dateFrom, dateTo, engineModel, engineNumber, barcodeScan, result)
+        var records = await WorkRecordQuery(date, dateFrom, dateTo, engineModel, engineNumber, barcodeScan)
             .OrderByDescending(x => x.CheckDate)
             .ThenByDescending(x => x.CheckTime)
             .ThenByDescending(x => x.Id)
-            .Take(500)
             .ToListAsync();
 
         await HydrateWorkRecordParameterContextAsync(records);
-        return ApiOk(records);
+        return ApiOk(FilterWorkRecordsByResult(records, result).Take(500).ToList());
     }
 
     [HttpGet("work-records/export")]
@@ -62,12 +61,13 @@ public class LeaktesterController : ApiControllerBase
             await EnsureLeakTestWorkRecordHmiColumnsAsync();
             await EnsureLeakTestJudgementTableAsync();
 
-            var records = await WorkRecordQuery(date, dateFrom, dateTo, engineModel, engineNumber, barcodeScan, result)
+            var records = await WorkRecordQuery(date, dateFrom, dateTo, engineModel, engineNumber, barcodeScan)
                 .OrderByDescending(x => x.CheckDate)
                 .ThenByDescending(x => x.CheckTime)
                 .ThenByDescending(x => x.Id)
                 .ToListAsync();
             await HydrateWorkRecordParameterContextAsync(records);
+            records = FilterWorkRecordsByResult(records, result).ToList();
 
             var effectiveDateFrom = dateFrom ?? date;
             var effectiveDateTo = dateTo ?? date;
@@ -97,14 +97,10 @@ public class LeaktesterController : ApiControllerBase
         var endDate = startDate.AddYears(1);
 
         var records = await _db.LeakTestWorkRecords.AsNoTracking()
+            .Include(x => x.EngineModel)
             .Where(x => x.CheckDate >= startDate && x.CheckDate < endDate)
-            .Select(x => new
-            {
-                x.CheckDate,
-                x.EngineNumber,
-                x.Result
-            })
             .ToListAsync();
+        await HydrateWorkRecordParameterContextAsync(records);
 
         var summaries = Enumerable.Range(1, 12)
             .Select(month =>
@@ -205,12 +201,6 @@ public class LeaktesterController : ApiControllerBase
 
             var operatorName = FirstText(request.OperatorName);
 
-            var result = request.Result.Trim().ToUpperInvariant();
-            if (result is not ("OK" or "NG"))
-            {
-                throw new ArgumentException("Result must be OK or NG.");
-            }
-
             var record = new LeakTestWorkRecord
             {
                 EngineModelId = engineModel.Id,
@@ -226,7 +216,6 @@ public class LeaktesterController : ApiControllerBase
                 PressSetLow = request.PressSetLow,
                 PressureInput = request.PressureInput,
                 CycleTimeLeakTestMinutes = request.CycleTimeLeakTestMinutes,
-                Result = result,
                 CreatedAt = DateTime.Now,
                 UpdatedAt = DateTime.Now
             };
@@ -283,10 +272,6 @@ public class LeaktesterController : ApiControllerBase
             }
 
             var judgement = await ResolveJudgementSnapshotAsync(request.Judgement);
-            if (judgement.Result is null)
-            {
-                throw new ArgumentException("Judgement must be OK or NG.");
-            }
 
             var engineModel = await FindOrCreateEngineModelAsync(engineModelText);
             var testedAt = request.TestedAt ?? DateTime.Now;
@@ -310,7 +295,6 @@ public class LeaktesterController : ApiControllerBase
                 CycleTimeLeakTestMinutes = request.CycleTime,
                 JudgementCode = judgement.JudgementCode,
                 JudgementName = judgement.JudgementName,
-                Result = judgement.Result,
                 CreatedAt = DateTime.Now,
                 UpdatedAt = DateTime.Now
             };
@@ -1122,6 +1106,7 @@ public class LeaktesterController : ApiControllerBase
             "ALTER TABLE leak_test_work_records ADD COLUMN judgement_code INT NULL AFTER cycle_time_leak_test_minutes");
         await DropHistoryOperatorIdColumnsAsync();
         await DropWorkRecordJudgementNameColumnAsync();
+        await DropWorkRecordResultColumnAsync();
         await EnsureIndexAsync(
             "leak_test_work_records",
             "ix_leak_test_work_records_barcode_scan",
@@ -1234,6 +1219,36 @@ EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 SET @sql := IF(@has_rework_operator_id > 0, 'ALTER TABLE rework_engine_records DROP COLUMN operator_id', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;");
+    }
+
+    private async Task DropWorkRecordResultColumnAsync()
+    {
+        await _db.Database.ExecuteSqlRawAsync(@"
+SET @has_work_result_index := (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'leak_test_work_records'
+      AND INDEX_NAME = 'ix_leak_test_work_records_result'
+);
+
+SET @sql := IF(@has_work_result_index > 0, 'DROP INDEX ix_leak_test_work_records_result ON leak_test_work_records', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @has_work_result := (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'leak_test_work_records'
+      AND COLUMN_NAME = 'result'
+);
+
+SET @sql := IF(@has_work_result > 0, 'ALTER TABLE leak_test_work_records DROP COLUMN result', 'SELECT 1');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;");
@@ -1516,7 +1531,71 @@ DEALLOCATE PREPARE stmt;");
             record.ParameterMin = context?.Min ?? (record.PressSetLow.HasValue ? FormatNormalizedPressure(record.PressSetLow.Value) : null);
             record.ParameterMax = context?.Max ?? (record.PressSetUp.HasValue ? FormatNormalizedPressure(record.PressSetUp.Value) : null);
             record.ParameterLimit = context?.Limit ?? FormatHmiPressureLimit(record.PressSetLow, record.PressSetUp);
+            record.Result = EvaluateWorkRecordResult(record);
         }
+    }
+
+    private static IEnumerable<LeakTestWorkRecord> FilterWorkRecordsByResult(
+        IEnumerable<LeakTestWorkRecord> records,
+        string? result)
+    {
+        var resultTerm = result?.Trim().ToUpperInvariant();
+        return resultTerm is "OK" or "NG"
+            ? records.Where(x => string.Equals(x.Result, resultTerm, StringComparison.OrdinalIgnoreCase))
+            : records;
+    }
+
+    private static string EvaluateWorkRecordResult(LeakTestWorkRecord record)
+    {
+        var lowerLimit = record.PressSetLow.HasValue
+            ? NormalizeCosmoPressure(record.PressSetLow.Value)
+            : ParsePressureValue(record.ParameterMin);
+        var upperLimit = record.PressSetUp.HasValue
+            ? NormalizeCosmoPressure(record.PressSetUp.Value)
+            : ParsePressureValue(record.ParameterMax);
+
+        return EvaluateWorkRecordResult(record.PressureInput, lowerLimit, upperLimit);
+    }
+
+    private static string EvaluateWorkRecordResult(decimal pressureInput, decimal? lowerLimit, decimal? upperLimit)
+    {
+        var normalizedInput = NormalizeCosmoPressure(pressureInput);
+        var normalizedLowerLimit = lowerLimit.HasValue ? NormalizeCosmoPressure(lowerLimit.Value) : (decimal?)null;
+        var normalizedUpperLimit = upperLimit.HasValue ? NormalizeCosmoPressure(upperLimit.Value) : (decimal?)null;
+
+        if (normalizedLowerLimit.HasValue && normalizedInput < normalizedLowerLimit.Value)
+        {
+            return "NG";
+        }
+
+        if (normalizedUpperLimit.HasValue && normalizedInput > normalizedUpperLimit.Value)
+        {
+            return "NG";
+        }
+
+        return "OK";
+    }
+
+    private static decimal? ParsePressureValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var chars = value
+            .Trim()
+            .TakeWhile(character => char.IsDigit(character) || character is '-' or '+' or '.' or ',')
+            .ToArray();
+        if (chars.Length == 0)
+        {
+            return null;
+        }
+
+        var numberText = new string(chars).Replace(',', '.');
+        return decimal.TryParse(numberText, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed)
+            ? NormalizeCosmoPressure(parsed)
+            : null;
     }
 
     private async Task HydrateWorkRecordJudgementsAsync(IReadOnlyCollection<LeakTestWorkRecord> records)
@@ -1721,8 +1800,7 @@ DEALLOCATE PREPARE stmt;");
         DateTime? dateTo,
         string? engineModel,
         string? engineNumber,
-        string? barcodeScan,
-        string? result)
+        string? barcodeScan)
     {
         IQueryable<LeakTestWorkRecord> query = _db.LeakTestWorkRecords.AsNoTracking()
             .Include(x => x.EngineModel);
@@ -1779,12 +1857,6 @@ DEALLOCATE PREPARE stmt;");
                     (x.BarcodeScan != null && x.BarcodeScan.Contains(barcodeTerm)) ||
                     x.EngineNumber.Contains(barcodeTerm) ||
                     (x.EngineModel != null && x.EngineModel.ModelName.Contains(barcodeTerm)));
-        }
-
-        var resultTerm = result?.Trim().ToUpperInvariant();
-        if (resultTerm is "OK" or "NG")
-        {
-            query = query.Where(x => x.Result == resultTerm);
         }
 
         return query;

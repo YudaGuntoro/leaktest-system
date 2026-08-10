@@ -33,15 +33,14 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
         try
         {
             var engineModelId = await ResolveEngineModelIdAsync(connection, transaction, record, cancellationToken);
-            var judgement = await ResolveJudgementSnapshotAsync(connection, transaction, record, cancellationToken);
             var barcodeScan = FirstText(record.BarcodeScan, BuildBarcodeScan(record.EngineModel, record.EngineNumber));
 
             await connection.ExecuteAsync(new CommandDefinition(
                 """
                 INSERT INTO leak_test_work_records
-                    (engine_model_id, engine_number, barcode_scan, check_date, check_time, machine_name, operator_name, parameter_pressure, channel_no, press_set_up, press_set_low, pressure_input, cycle_time_leak_test_minutes, judgement_code, result, created_at, updated_at)
+                    (engine_model_id, engine_number, barcode_scan, check_date, check_time, machine_name, operator_name, parameter_pressure, channel_no, press_set_up, press_set_low, pressure_input, cycle_time_leak_test_minutes, judgement_code, created_at, updated_at)
                 VALUES
-                    (@engine_model_id, @engine_number, @barcode_scan, @check_date, @check_time, @machine_name, @operator_name, @parameter_pressure, @channel_no, @press_set_up, @press_set_low, @pressure_input, @cycle_time, @judgement_code, @result, NOW(), NOW());
+                    (@engine_model_id, @engine_number, @barcode_scan, @check_date, @check_time, @machine_name, @operator_name, @parameter_pressure, @channel_no, @press_set_up, @press_set_low, @pressure_input, @cycle_time, @judgement_code, NOW(), NOW());
                 """,
                 new
                 {
@@ -58,8 +57,7 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
                     press_set_low = record.PressSetLow,
                     pressure_input = record.PressureInput,
                     cycle_time = record.CycleTimeLeakTestMinutes,
-                    judgement_code = judgement.JudgementCode,
-                    result = judgement.Result
+                    judgement_code = record.JudgementCode
                 },
                 transaction,
                 cancellationToken: cancellationToken));
@@ -137,54 +135,6 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
             cancellationToken: cancellationToken));
     }
 
-    private sealed class LeakTestJudgementSnapshot
-    {
-        public int? JudgementCode { get; init; }
-
-        public string Result { get; init; } = string.Empty;
-    }
-
-    private static async Task<LeakTestJudgementSnapshot> ResolveJudgementSnapshotAsync(
-        MySqlConnection connection,
-        MySqlTransaction transaction,
-        LeakTestHistoryRecord record,
-        CancellationToken cancellationToken)
-    {
-        if (record.JudgementCode.HasValue)
-        {
-            var masterJudgement = await connection.QueryFirstOrDefaultAsync<LeakTestJudgementSnapshot>(new CommandDefinition(
-                """
-                SELECT
-                    judgement_code AS JudgementCode,
-                    result AS Result
-                FROM leak_test_judgements
-                WHERE judgement_code = @judgement_code
-                  AND is_deleted <> 1
-                LIMIT 1;
-                """,
-                new { judgement_code = record.JudgementCode.Value },
-                transaction,
-                cancellationToken: cancellationToken));
-
-            if (masterJudgement?.Result is "OK" or "NG")
-            {
-                return masterJudgement;
-            }
-
-            return new LeakTestJudgementSnapshot
-            {
-                JudgementCode = record.JudgementCode,
-                Result = record.Result
-            };
-        }
-
-        return new LeakTestJudgementSnapshot
-        {
-            JudgementCode = record.JudgementCode,
-            Result = record.Result
-        };
-    }
-
     private static async Task EnsureHmiColumnsAsync(MySqlConnection connection, CancellationToken cancellationToken)
     {
         await EnsureColumnAsync(connection, "barcode_scan", "ALTER TABLE leak_test_work_records ADD COLUMN barcode_scan VARCHAR(180) NULL AFTER engine_number", cancellationToken);
@@ -194,9 +144,34 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
         await EnsureColumnAsync(connection, "operator_name", "ALTER TABLE leak_test_work_records ADD COLUMN operator_name VARCHAR(150) NULL AFTER machine_name", cancellationToken);
         await EnsureColumnAsync(connection, "judgement_code", "ALTER TABLE leak_test_work_records ADD COLUMN judgement_code INT NULL AFTER cycle_time_leak_test_minutes", cancellationToken);
         await DropJudgementNameColumnAsync(connection, cancellationToken);
+        await DropResultColumnAsync(connection, cancellationToken);
         await EnsureIndexAsync(connection, "ix_leak_test_work_records_barcode_scan", "CREATE INDEX ix_leak_test_work_records_barcode_scan ON leak_test_work_records (barcode_scan)", cancellationToken);
         await EnsureIndexAsync(connection, "ix_leak_test_work_records_channel_no", "CREATE INDEX ix_leak_test_work_records_channel_no ON leak_test_work_records (channel_no)", cancellationToken);
         await EnsureIndexAsync(connection, "ix_leak_test_work_records_judgement_code", "CREATE INDEX ix_leak_test_work_records_judgement_code ON leak_test_work_records (judgement_code)", cancellationToken);
+    }
+
+    private static async Task DropResultColumnAsync(MySqlConnection connection, CancellationToken cancellationToken)
+    {
+        await DropIndexIfExistsAsync(connection, "ix_leak_test_work_records_result", cancellationToken);
+
+        var exists = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            """
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'leak_test_work_records'
+              AND COLUMN_NAME = 'result';
+            """,
+            cancellationToken: cancellationToken));
+
+        if (exists == 0)
+        {
+            return;
+        }
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            "ALTER TABLE leak_test_work_records DROP COLUMN result;",
+            cancellationToken: cancellationToken));
     }
 
     private static async Task DropJudgementNameColumnAsync(MySqlConnection connection, CancellationToken cancellationToken)
@@ -324,6 +299,32 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
 
         await connection.ExecuteAsync(new CommandDefinition(
             createSql,
+            cancellationToken: cancellationToken));
+    }
+
+    private static async Task DropIndexIfExistsAsync(
+        MySqlConnection connection,
+        string indexName,
+        CancellationToken cancellationToken)
+    {
+        var count = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            """
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'leak_test_work_records'
+              AND INDEX_NAME = @index_name;
+            """,
+            new { index_name = indexName },
+            cancellationToken: cancellationToken));
+
+        if (count == 0)
+        {
+            return;
+        }
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            $"DROP INDEX {indexName} ON leak_test_work_records;",
             cancellationToken: cancellationToken));
     }
 
