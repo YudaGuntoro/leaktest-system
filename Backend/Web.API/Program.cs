@@ -21,6 +21,10 @@ builder.Host.UseSerilog((context, loggerConfiguration) =>
         .Enrich.FromLogContext()
         .WriteTo.Console(); // Include console logging
 });
+builder.Host.UseWindowsService(options =>
+{
+    options.ServiceName = "Web.API";
+});
 
 // Add services to the container
 builder.Services.AddInfrastructure(builder.Configuration);

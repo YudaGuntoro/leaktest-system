@@ -11,6 +11,7 @@ deploy/*.env
 **/bin/
 **/obj/
 **/logs/
+**/Properties/PublishProfiles/
 *.user
 *.suo
 *.lscache
