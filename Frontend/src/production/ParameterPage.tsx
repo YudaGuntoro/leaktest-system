@@ -176,9 +176,14 @@ export default function ParameterPage() {
     {
       key: "channel_no",
       header: "Channel No",
+      rowSpanKey: (row) => row.channel_no,
       render: (value) => <span className="font-bold text-slate-900 dark:text-white">{String(value || "-")}</span>,
     },
-    { key: "model_parameter", header: "Model Parameter" },
+    {
+      key: "model_parameter",
+      header: "Model Parameter",
+      rowSpanKey: (row) => `${row.channel_no}::${row.model_parameter}`,
+    },
     { key: "item_name", header: "Item Name" },
     {
       key: "item_value",

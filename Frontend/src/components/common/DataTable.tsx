@@ -17,6 +17,7 @@ export type DataTableColumn<T extends object> = {
   header: React.ReactNode;
   accessor?: keyof T | string | ((row: T) => React.ReactNode);
   render?: (value: unknown, row: T, index: number) => React.ReactNode;
+  rowSpanKey?: (row: T) => string | number | null | undefined;
   align?: "left" | "center" | "right";
   className?: string;
   headerClassName?: string;
@@ -94,6 +95,38 @@ const getColumnValue = <T extends object>(
   }
 
   return getNestedValue(row, column.key);
+};
+
+const normalizeRowSpanKey = (value: string | number | null | undefined) =>
+  value === null || value === undefined ? "" : String(value);
+
+const getColumnRowSpan = <T extends object>(
+  data: T[],
+  column: DataTableColumn<T>,
+  index: number
+) => {
+  if (!column.rowSpanKey) {
+    return 1;
+  }
+
+  const currentKey = normalizeRowSpanKey(column.rowSpanKey(data[index]));
+  const previousKey = index > 0 ? normalizeRowSpanKey(column.rowSpanKey(data[index - 1])) : null;
+
+  if (previousKey === currentKey) {
+    return 0;
+  }
+
+  let rowSpan = 1;
+  for (let nextIndex = index + 1; nextIndex < data.length; nextIndex += 1) {
+    const nextKey = normalizeRowSpanKey(column.rowSpanKey(data[nextIndex]));
+    if (nextKey !== currentKey) {
+      break;
+    }
+
+    rowSpan += 1;
+  }
+
+  return rowSpan;
 };
 
 const formatCellValue = (value: unknown) => {
@@ -372,11 +405,17 @@ export default function DataTable<T extends object>({
                   >
                     {columns.map((column) => {
                       const value = getColumnValue(row, column);
+                      const rowSpan = getColumnRowSpan(data, column, index);
+
+                      if (rowSpan === 0) {
+                        return null;
+                      }
 
                       return (
                         <TableCell
                           key={column.key}
-                          className={`px-5 py-4 text-theme-sm text-gray-700 dark:text-gray-300 ${
+                          rowSpan={rowSpan}
+                          className={`align-middle px-5 py-4 text-theme-sm text-gray-700 dark:text-gray-300 ${
                             alignClasses[column.align ?? "left"]
                           } ${column.className ?? ""}`}
                         >
