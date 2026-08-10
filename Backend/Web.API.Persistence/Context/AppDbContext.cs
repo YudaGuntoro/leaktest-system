@@ -15,6 +15,7 @@ public class AppDbContext : DbContext
     public DbSet<EngineModel> EngineModels => Set<EngineModel>();
     public DbSet<Operator> Operators => Set<Operator>();
     public DbSet<LeakTestParameter> LeakTestParameters => Set<LeakTestParameter>();
+    public DbSet<LeakTestJudgement> LeakTestJudgements => Set<LeakTestJudgement>();
     public DbSet<MeasurementUnit> MeasurementUnits => Set<MeasurementUnit>();
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
     public DbSet<LeakTestWorkRecord> LeakTestWorkRecords => Set<LeakTestWorkRecord>();
@@ -102,6 +103,22 @@ public class AppDbContext : DbContext
             entity.HasIndex(x => new { x.ChannelNo, x.ItemName }).IsUnique();
             entity.HasIndex(x => x.ChannelNo);
             entity.HasIndex(x => x.ModelParameter);
+        });
+
+        modelBuilder.Entity<LeakTestJudgement>(entity =>
+        {
+            entity.ToTable("leak_test_judgements");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.JudgementCode).HasColumnName("judgement_code");
+            entity.Property(x => x.JudgementName).HasColumnName("judgement_name").HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Result).HasColumnName("result").HasMaxLength(10).IsRequired();
+            entity.Property(x => x.Note).HasColumnName("note").HasMaxLength(150);
+            entity.Property(x => x.IsDeleted).HasColumnName("is_deleted");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasIndex(x => x.JudgementCode).IsUnique();
+            entity.HasIndex(x => x.Result);
         });
 
         modelBuilder.Entity<MeasurementUnit>(entity =>

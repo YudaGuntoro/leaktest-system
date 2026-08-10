@@ -74,3 +74,4 @@ SOURCE Backend/Web.API.Persistence/Migrations/20260810_001_system_settings_units
 SOURCE Backend/Web.API.Persistence/Migrations/20260810_002_history_operator_snapshot.sql;
 SOURCE Backend/Web.API.Persistence/Migrations/20260810_003_drop_history_operator_id.sql;
 SOURCE Backend/Web.API.Persistence/Migrations/20260810_004_plc_ip_setting.sql;
+SOURCE Backend/Web.API.Persistence/Migrations/20260810_005_leak_test_judgements.sql;

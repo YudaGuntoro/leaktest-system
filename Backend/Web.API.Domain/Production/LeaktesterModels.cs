@@ -78,6 +78,33 @@ public class LeakTestParameter
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 }
 
+public class LeakTestJudgement
+{
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
+
+    [JsonPropertyName("judgement_code")]
+    public int JudgementCode { get; set; }
+
+    [JsonPropertyName("judgement_name")]
+    public string JudgementName { get; set; } = string.Empty;
+
+    [JsonPropertyName("result")]
+    public string Result { get; set; } = "NG";
+
+    [JsonPropertyName("note")]
+    public string? Note { get; set; }
+
+    [JsonPropertyName("is_deleted")]
+    public bool? IsDeleted { get; set; }
+
+    [JsonPropertyName("created_at")]
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+    [JsonPropertyName("updated_at")]
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
+}
+
 public class MeasurementUnit
 {
     [JsonPropertyName("id")]

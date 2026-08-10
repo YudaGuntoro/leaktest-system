@@ -66,6 +66,7 @@ public static class LeakTestPayloadMapper
         var parameterPressure = ReadDecimal(message.Data, "parameter_pressure", "parameterPressure", "ParameterPressure", "set_pressure", "SetPressure", "target_pressure", "TargetPressure", "pressure_setting", "PressureSetting")
             ?? CalculateParameterPressure(pressSetLow, pressSetUp);
 
+        var judgementCode = ReadInt(message.Data, "judgement", "Judgement", "judgement_code", "JudgementCode");
         var record = new LeakTestHistoryRecord
         {
             EngineModelId = ReadInt(message.Data, "engine_model_id", "engineModelId", "EngineModelId", "model_id", "ModelId"),
@@ -83,6 +84,7 @@ public static class LeakTestPayloadMapper
             PressSetLow = pressSetLow,
             PressureInput = NormalizeCosmoPressure(ReadDecimal(message.Data, "pressure_input", "pressureInput", "PressureInput", "press_input", "actual_pressure", "ActualPressure", "leak_pressure", "LeakPressure") ?? 0),
             CycleTimeLeakTestMinutes = ReadCycleTime(message.Data) ?? 0,
+            JudgementCode = judgementCode,
             Result = NormalizeResult(ReadString(message.Data, "result", "Result", "judgement", "Judgement", "status", "Status")) ?? string.Empty
         };
 
@@ -251,8 +253,8 @@ public static class LeakTestPayloadMapper
 
         return value.Trim().ToUpperInvariant() switch
         {
-            "OK" or "PASS" or "PASSED" or "TRUE" or "1" => "OK",
-            "NG" or "NOK" or "FAIL" or "FAILED" or "FALSE" or "0" or "2" => "NG",
+            "OK" or "PASS" or "PASSED" or "TRUE" or "2" => "OK",
+            "NG" or "NOK" or "FAIL" or "FAILED" or "FALSE" or "0" or "1" or "3" or "4" or "5" or "6" or "7" => "NG",
             _ => null
         };
     }

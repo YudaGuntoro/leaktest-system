@@ -668,6 +668,18 @@ public class LeaktesterController : ApiControllerBase
             .ToListAsync());
     }
 
+    [HttpGet("judgements")]
+    public async Task<IActionResult> Judgements()
+    {
+        await EnsureLeakTestJudgementTableAsync();
+
+        return ApiOk(await _db.LeakTestJudgements
+            .AsNoTracking()
+            .Where(x => x.IsDeleted != true)
+            .OrderBy(x => x.JudgementCode)
+            .ToListAsync());
+    }
+
     [HttpPost("parameters")]
     public async Task<IActionResult> CreateParameter([FromBody] CreateLeakTestParameterRequest request)
     {
@@ -1368,8 +1380,8 @@ DEALLOCATE PREPARE stmt;");
 
         return value.Trim().ToUpperInvariant() switch
         {
-            "OK" or "PASS" or "PASSED" or "TRUE" or "1" => "OK",
-            "NG" or "NOK" or "FAIL" or "FAILED" or "FALSE" or "0" => "NG",
+            "OK" or "PASS" or "PASSED" or "TRUE" or "2" => "OK",
+            "NG" or "NOK" or "FAIL" or "FAILED" or "FALSE" or "0" or "1" or "3" or "4" or "5" or "6" or "7" => "NG",
             _ => null
         };
     }
@@ -1719,6 +1731,41 @@ CREATE TABLE IF NOT EXISTS leak_test_parameters (
     KEY ix_leak_test_parameters_channel_no (channel_no),
     KEY ix_leak_test_parameters_model_parameter (model_parameter)
 )");
+    }
+
+    private async Task EnsureLeakTestJudgementTableAsync()
+    {
+        await _db.Database.ExecuteSqlRawAsync(@"
+CREATE TABLE IF NOT EXISTS leak_test_judgements (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    judgement_code INT NOT NULL,
+    judgement_name VARCHAR(80) NOT NULL,
+    result VARCHAR(10) NOT NULL,
+    note VARCHAR(150) NULL,
+    is_deleted TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_leak_test_judgements_code (judgement_code),
+    KEY ix_leak_test_judgements_result (result)
+)");
+
+        await _db.Database.ExecuteSqlRawAsync(@"
+INSERT INTO leak_test_judgements
+    (judgement_code, judgement_name, result, note, is_deleted)
+VALUES
+    (1, 'DUMMY-1', 'NG', 'Temporary dummy judgement', 0),
+    (2, 'OK', 'OK', 'Gateway judgement OK', 0),
+    (3, 'DUMMY-3', 'NG', 'Temporary dummy judgement', 0),
+    (4, 'NG', 'NG', 'Gateway judgement NG', 0),
+    (5, 'DUMMY-5', 'NG', 'Temporary dummy judgement', 0),
+    (6, 'DUMMY-6', 'NG', 'Temporary dummy judgement', 0),
+    (7, 'DUMMY-7', 'NG', 'Temporary dummy judgement', 0)
+ON DUPLICATE KEY UPDATE
+    judgement_name = VALUES(judgement_name),
+    result = VALUES(result),
+    note = VALUES(note),
+    is_deleted = VALUES(is_deleted),
+    updated_at = CURRENT_TIMESTAMP");
     }
 
     private static List<ParameterExcelRow> ReadParameterRowsFromExcel(IFormFile file)
