@@ -387,6 +387,21 @@ public class CreateLeakTestParameterRequest
     public bool? IsDeleted { get; set; }
 }
 
+public class UpdateLeakTestJudgementRequest
+{
+    [JsonPropertyName("judgement_name")]
+    public string JudgementName { get; set; } = string.Empty;
+
+    [JsonPropertyName("result")]
+    public string Result { get; set; } = "NG";
+
+    [JsonPropertyName("note")]
+    public string? Note { get; set; }
+
+    [JsonPropertyName("is_deleted")]
+    public bool? IsDeleted { get; set; }
+}
+
 public class UpdateSystemSettingsRequest
 {
     [JsonPropertyName("pressure_unit")]

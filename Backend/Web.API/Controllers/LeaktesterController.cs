@@ -680,6 +680,45 @@ public class LeaktesterController : ApiControllerBase
             .ToListAsync());
     }
 
+    [HttpPut("judgements/{id:int}")]
+    public async Task<IActionResult> UpdateJudgement(int id, [FromBody] UpdateLeakTestJudgementRequest request)
+    {
+        try
+        {
+            await EnsureLeakTestJudgementTableAsync();
+
+            if (string.IsNullOrWhiteSpace(request.JudgementName))
+            {
+                throw new ArgumentException("Judgement name is required.");
+            }
+
+            var result = request.Result.Trim().ToUpperInvariant();
+            if (result is not ("OK" or "NG"))
+            {
+                throw new ArgumentException("Result must be OK or NG.");
+            }
+
+            var item = await _db.LeakTestJudgements.FirstOrDefaultAsync(x => x.Id == id);
+            if (item is null)
+            {
+                return ApiNotFound("Judgement was not found.");
+            }
+
+            item.JudgementName = TrimTo(request.JudgementName, 80);
+            item.Result = result;
+            item.Note = string.IsNullOrWhiteSpace(request.Note) ? null : TrimTo(request.Note, 150);
+            item.IsDeleted = request.IsDeleted ?? false;
+            item.UpdatedAt = DateTime.Now;
+
+            await _db.SaveChangesAsync();
+            return ApiOk(item, "Judgement updated successfully.");
+        }
+        catch (Exception ex)
+        {
+            return ApiBadRequest(ex);
+        }
+    }
+
     [HttpPost("parameters")]
     public async Task<IActionResult> CreateParameter([FromBody] CreateLeakTestParameterRequest request)
     {

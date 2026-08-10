@@ -38,6 +38,17 @@ export type LeakTestParameterImportResult = {
 
 export type LeakTestResult = "OK" | "NG";
 
+export type LeakTestJudgement = {
+  id: number;
+  judgement_code: number;
+  judgement_name: string;
+  result: LeakTestResult;
+  note?: string | null;
+  is_deleted?: boolean | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type LeakTestWorkRecord = {
   id: number;
   engine_model_id: number;
