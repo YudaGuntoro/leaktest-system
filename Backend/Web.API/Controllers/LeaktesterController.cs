@@ -674,11 +674,23 @@ public class LeaktesterController : ApiControllerBase
     {
         await EnsureLeakTestJudgementTableAsync();
 
-        return ApiOk(await _db.LeakTestJudgements
+        var items = await _db.LeakTestJudgements
             .AsNoTracking()
             .Where(x => x.IsDeleted != true)
             .OrderBy(x => x.JudgementCode)
-            .ToListAsync());
+            .ToListAsync();
+
+        if (items.Count == 0)
+        {
+            await SeedDefaultHmiJudgementsAsync();
+            items = await _db.LeakTestJudgements
+                .AsNoTracking()
+                .Where(x => x.IsDeleted != true)
+                .OrderBy(x => x.JudgementCode)
+                .ToListAsync();
+        }
+
+        return ApiOk(items);
     }
 
     [HttpPut("judgements/{id:int}")]
@@ -1823,6 +1835,32 @@ ON DUPLICATE KEY UPDATE
     note = IF(note LIKE 'Temporary dummy%' OR note IN ('Gateway judgement OK', 'Gateway judgement NG'), VALUES(note), note),
     is_deleted = IF(judgement_name LIKE 'DUMMY-%' OR judgement_name IN ('OK', 'NG'), VALUES(is_deleted), is_deleted),
     judgement_name = IF(judgement_name LIKE 'DUMMY-%' OR judgement_name IN ('OK', 'NG'), VALUES(judgement_name), judgement_name),
+    updated_at = CURRENT_TIMESTAMP");
+
+        await _db.Database.ExecuteSqlRawAsync(@"
+UPDATE leak_test_judgements
+SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP
+WHERE judgement_code = 7
+  AND judgement_name = 'DUMMY-7'");
+    }
+
+    private async Task SeedDefaultHmiJudgementsAsync()
+    {
+        await _db.Database.ExecuteSqlRawAsync(@"
+INSERT INTO leak_test_judgements
+    (judgement_code, judgement_name, result, note, is_deleted)
+VALUES
+    (1, 'LL NG', 'NG', 'HMI judgement', 0),
+    (2, 'PASS', 'OK', 'HMI judgement', 0),
+    (3, 'UL NG', 'NG', 'HMI judgement', 0),
+    (4, 'LL2 NG', 'NG', 'HMI judgement', 0),
+    (5, 'UL2 NG', 'NG', 'HMI judgement', 0),
+    (6, 'ERROR', 'NG', 'HMI judgement', 0)
+ON DUPLICATE KEY UPDATE
+    judgement_name = VALUES(judgement_name),
+    result = VALUES(result),
+    note = VALUES(note),
+    is_deleted = VALUES(is_deleted),
     updated_at = CURRENT_TIMESTAMP");
 
         await _db.Database.ExecuteSqlRawAsync(@"
