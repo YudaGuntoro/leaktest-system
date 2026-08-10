@@ -49,11 +49,11 @@ function displayJudgement(record: LeakTestWorkRecord) {
   const code = record.judgement_code ?? null;
   const name = displayOptional(record.judgement_name);
 
-  if (code === null) {
+  if (name !== "-") {
     return name;
   }
 
-  return name === "-" ? String(code) : `${code} - ${name}`;
+  return code === null ? "-" : String(code);
 }
 
 function pressureInputStateClass(result: LeakTestResult) {
@@ -563,7 +563,7 @@ export default function WorkRecordPage() {
                 <th className="bg-brand-500 px-4 py-3">Pressure Limit (TP LL ~ TP UL) ({pressureUnit})</th>
                 <th className="bg-brand-500 px-4 py-3">Pressure Input ({pressureUnit})</th>
                 <th className="bg-brand-500 px-4 py-3">Cycle Time ({cycleTimeUnit})</th>
-                <th className="bg-brand-500 px-4 py-3">Judgement</th>
+                <th className="bg-brand-500 px-4 py-3">Judgement Name</th>
                 <th className="rounded-r-lg bg-brand-500 px-5 py-3">Result</th>
               </tr>
             </thead>
@@ -686,7 +686,7 @@ export default function WorkRecordPage() {
                 valueClassName={pressureInputTextClass(selectedRecord.result)}
               />
               <DetailItem label={`Cycle Time (${cycleTimeUnit})`} value={selectedRecord.cycle_time_leak_test_minutes} />
-              <DetailItem label="Judgement" value={displayJudgement(selectedRecord)} />
+              <DetailItem label="Judgement Name" value={displayJudgement(selectedRecord)} />
               <DetailItem
                 label="Result"
                 value={

@@ -343,7 +343,7 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
 
     private static string? BuildBarcodeScan(string? engineModel, string? serialNo)
     {
-        var model = engineModel?.Trim();
+        var model = engineModel?.Trim().TrimStart('.');
         var serial = serialNo?.Trim();
 
         if (string.IsNullOrWhiteSpace(model) || string.IsNullOrWhiteSpace(serial))

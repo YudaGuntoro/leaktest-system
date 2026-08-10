@@ -34,6 +34,10 @@ function currentTimeValue() {
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
+function normalizeBarcodeScan(value: FormDataEntryValue | null) {
+  return String(value ?? "").trim().replace(/^\.+/, "");
+}
+
 function fileDate(value: string) {
   if (!value) return "All";
   const date = new Date(value);
@@ -151,10 +155,11 @@ export default function FormManualPage({ publicAccess = false }: FormManualPageP
     setBusy(true);
     setMessage(null);
     const form = new FormData(event.currentTarget);
+    const barcodeScan = normalizeBarcodeScan(form.get("barcode_scan"));
 
     try {
       await apiPost<ReworkEngineRecord>("/api/leaktester/rework-engine-records", {
-        barcode_scan: form.get("barcode_scan"),
+        barcode_scan: barcodeScan,
         operator_name: form.get("operator_name"),
         parameter_pressure: Number(form.get("parameter_pressure")),
         pressure_input: Number(form.get("pressure_input")),
@@ -283,7 +288,16 @@ export default function FormManualPage({ publicAccess = false }: FormManualPageP
           <div className="grid gap-5 px-6 py-6 sm:grid-cols-2">
             <label className={labelClass}>
               Scan Barcode
-              <input className={`${publicInputClass} mt-2`} name="barcode_scan" placeholder="TF65R DUMMY-LT-20260807-001" required autoFocus />
+              <input
+                className={`${publicInputClass} mt-2`}
+                name="barcode_scan"
+                onChange={(event) => {
+                  event.currentTarget.value = normalizeBarcodeScan(event.currentTarget.value);
+                }}
+                placeholder="TF65R DUMMY-LT-20260807-001"
+                required
+                autoFocus
+              />
             </label>
             <label className={labelClass}>
               Operator
@@ -350,7 +364,16 @@ export default function FormManualPage({ publicAccess = false }: FormManualPageP
           <div className="grid gap-4 px-6 py-5 sm:grid-cols-2">
             <label className={labelClass}>
               Scan Barcode
-              <input className={`${inputClass} mt-2`} name="barcode_scan" placeholder="TF65R DUMMY-LT-20260807-001" required autoFocus />
+              <input
+                className={`${inputClass} mt-2`}
+                name="barcode_scan"
+                onChange={(event) => {
+                  event.currentTarget.value = normalizeBarcodeScan(event.currentTarget.value);
+                }}
+                placeholder="TF65R DUMMY-LT-20260807-001"
+                required
+                autoFocus
+              />
             </label>
             <label className={labelClass}>
               Operator

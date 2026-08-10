@@ -51,30 +51,32 @@ public static class LeakTestPayloadMapper
             Data = SelectDataObject(root)
         };
 
-        var timestamp = ReadDateTime(message.Data, "tested_at", "testedAt", "TestedAt", "timestamp", "Timestamp", "ts", "created_at", "CreatedAt", "date_time", "DateTime", "test_datetime", "TestDateTime");
-        var checkDate = ReadDate(message.Data, "check_date", "checkDate", "CheckDate", "date", "Date", "test_date", "TestDate")
-            ?? timestamp?.Date
-            ?? DateTime.Today;
-        var checkTime = ReadString(message.Data, "check_time", "checkTime", "CheckTime", "time", "Time", "test_time", "TestTime");
-        if (string.IsNullOrWhiteSpace(checkTime))
-        {
-            checkTime = (timestamp ?? DateTime.Now).ToString("HH:mm:ss", CultureInfo.InvariantCulture);
-        }
+        var serverNow = DateTime.Now;
+        var checkDate = serverNow.Date;
+        var checkTime = serverNow.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
 
         var pressSetUp = ReadDecimal(message.Data, "press_set_up", "pressSetUp", "PressSetUp", "upper_press_limit", "UpperPressLimit", "tp_ul", "TP_UL");
         var pressSetLow = ReadDecimal(message.Data, "press_set_low", "pressSetLow", "PressSetLow", "lower_press_limit", "LowerPressLimit", "tp_ll", "TP_LL");
         var parameterPressure = ReadDecimal(message.Data, "parameter_pressure", "parameterPressure", "ParameterPressure", "set_pressure", "SetPressure", "target_pressure", "TargetPressure", "pressure_setting", "PressureSetting")
             ?? CalculateParameterPressure(pressSetLow, pressSetUp);
 
+        var rawBarcode = ReadString(message.Data, "barcode", "Barcode", "barcode_scan", "barcodeScan", "BarcodeScan");
+        var normalizedBarcode = NormalizeBarcodeScan(rawBarcode);
+        var (barcodeEngineModel, barcodeEngineNumber) = ParseBarcodeScan(rawBarcode);
+        var explicitEngineNumber = ReadString(message.Data, "engine_number", "engineNumber", "EngineNumber", "engine_no", "EngineNo", "serial_no", "serial no", "serial_number", "SerialNumber");
+        var engineModel = FirstText(
+            ReadString(message.Data, "engine_model", "engineModel", "EngineModel", "model", "Model", "engine_type", "EngineType"),
+            barcodeEngineModel);
+        var engineNumber = FirstText(explicitEngineNumber, barcodeEngineNumber, normalizedBarcode);
         var judgementCode = ReadInt(message.Data, "judgement", "Judgement", "judgement_code", "JudgementCode");
         var record = new LeakTestHistoryRecord
         {
             EngineModelId = ReadInt(message.Data, "engine_model_id", "engineModelId", "EngineModelId", "model_id", "ModelId"),
-            EngineModel = ReadString(message.Data, "engine_model", "engineModel", "EngineModel", "model", "Model", "engine_type", "EngineType"),
-            EngineNumber = ReadString(message.Data, "engine_number", "engineNumber", "EngineNumber", "engine_no", "EngineNo", "serial_no", "serial no", "serial_number", "SerialNumber", "barcode", "Barcode") ?? string.Empty,
-            BarcodeScan = ReadString(message.Data, "barcode", "Barcode", "barcode_scan", "barcodeScan", "BarcodeScan"),
+            EngineModel = engineModel,
+            EngineNumber = engineNumber ?? string.Empty,
+            BarcodeScan = normalizedBarcode,
             CheckDate = checkDate.Date,
-            CheckTime = NormalizeTime(checkTime),
+            CheckTime = checkTime,
             MachineName = ReadString(message.Data, "machine_name", "machineName", "MachineName", "machine", "Machine", "line", "Line", "LineNo")
                 ?? SignalHelper.TopicToMachineName(message.Topic),
             Operator = ReadString(message.Data, "operator", "Operator", "operator_name", "operatorName", "OperatorName", "operator_code", "operatorCode", "OperatorCode"),
@@ -120,6 +122,45 @@ public static class LeakTestPayloadMapper
             : token?.ToString();
 
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string? FirstText(params string?[] values)
+    {
+        return values
+            .Select(value => value?.Trim())
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+    }
+
+    private static string? NormalizeBarcodeScan(string? barcodeScan)
+    {
+        if (string.IsNullOrWhiteSpace(barcodeScan))
+        {
+            return null;
+        }
+
+        var normalized = barcodeScan.Trim().TrimStart('.');
+        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+    }
+
+    private static (string? EngineModel, string? EngineNumber) ParseBarcodeScan(string? barcodeScan)
+    {
+        var normalized = NormalizeBarcodeScan(barcodeScan);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return (null, null);
+        }
+
+        var separatorIndex = normalized.IndexOfAny([' ', '\t', '\r', '\n']);
+        if (separatorIndex < 0)
+        {
+            return (normalized, null);
+        }
+
+        var engineModel = normalized[..separatorIndex].Trim();
+        var engineNumber = normalized[(separatorIndex + 1)..].Trim();
+        return (
+            string.IsNullOrWhiteSpace(engineModel) ? null : engineModel,
+            string.IsNullOrWhiteSpace(engineNumber) ? null : engineNumber);
     }
 
     private static int? ReadInt(JObject source, params string[] names)
@@ -184,36 +225,6 @@ public static class LeakTestPayloadMapper
             : null;
     }
 
-    private static DateTime? ReadDate(JObject source, params string[] names)
-    {
-        var dateTime = ReadDateTime(source, names);
-        return dateTime?.Date;
-    }
-
-    private static DateTime? ReadDateTime(JObject source, params string[] names)
-    {
-        var token = ReadToken(source, names);
-        if (token is null || token.Type == JTokenType.Null)
-        {
-            return null;
-        }
-
-        if (token.Type == JTokenType.Date)
-        {
-            return token.Value<DateTime>();
-        }
-
-        var value = token.ToString().Trim();
-        if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var invariant))
-        {
-            return invariant;
-        }
-
-        return DateTime.TryParse(value, CultureInfo.CurrentCulture, DateTimeStyles.AssumeLocal, out var local)
-            ? local
-            : null;
-    }
-
     private static JToken? ReadToken(JObject source, params string[] names)
     {
         foreach (var name in names)
@@ -226,21 +237,6 @@ public static class LeakTestPayloadMapper
         }
 
         return null;
-    }
-
-    private static string NormalizeTime(string value)
-    {
-        if (TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var time))
-        {
-            return time.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
-        }
-
-        if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var dateTime))
-        {
-            return dateTime.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
-        }
-
-        return value.Length > 8 ? value[..8] : value;
     }
 
     private static decimal? CalculateParameterPressure(decimal? pressSetLow, decimal? pressSetUp)

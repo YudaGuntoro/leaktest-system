@@ -240,7 +240,7 @@ public class LeaktesterController : ApiControllerBase
         {
             await EnsureLeakTestWorkRecordHmiColumnsAsync();
 
-            var barcode = FirstText(request.BarcodeScan, request.Barcode);
+            var barcode = NormalizeBarcodeScan(FirstText(request.BarcodeScan, request.Barcode));
             var (barcodeEngineModel, barcodeEngineNumber) = ParseBarcodeScan(barcode);
             var engineModelText = FirstText(request.EngineModel, barcodeEngineModel);
             var engineNumber = FirstText(request.SerialNo, request.SerialNoText, request.EngineNumber, barcodeEngineNumber, barcode);
@@ -432,7 +432,8 @@ public class LeaktesterController : ApiControllerBase
 
             var operatorName = FirstText(request.OperatorName);
 
-            var (barcodeEngineModel, barcodeEngineNumber) = ParseBarcodeScan(request.BarcodeScan);
+            var barcodeScan = NormalizeBarcodeScan(request.BarcodeScan);
+            var (barcodeEngineModel, barcodeEngineNumber) = ParseBarcodeScan(barcodeScan);
             if (string.IsNullOrWhiteSpace(barcodeEngineNumber))
             {
                 barcodeEngineNumber = barcodeEngineModel;
@@ -457,7 +458,7 @@ public class LeaktesterController : ApiControllerBase
                 EngineModelId = engineModel?.Id,
                 EngineModelText = engineModel is null ? barcodeEngineModel : null,
                 EngineNumber = barcodeEngineNumber.Trim(),
-                BarcodeScan = request.BarcodeScan.Trim(),
+                BarcodeScan = barcodeScan ?? request.BarcodeScan.Trim(),
                 ReworkDate = request.ReworkDate.Date,
                 ReworkTime = NormalizeCheckTime(request.ReworkTime),
                 OperatorName = string.IsNullOrWhiteSpace(operatorName) ? null : TrimTo(operatorName, 150),
@@ -1457,7 +1458,7 @@ DEALLOCATE PREPARE stmt;");
 
     private static string? BuildBarcodeScan(string? engineModel, string? serialNo)
     {
-        var model = engineModel?.Trim();
+        var model = engineModel?.Trim().TrimStart('.');
         var serial = serialNo?.Trim();
 
         if (string.IsNullOrWhiteSpace(model) || string.IsNullOrWhiteSpace(serial))
@@ -1466,6 +1467,17 @@ DEALLOCATE PREPARE stmt;");
         }
 
         return TrimTo($"{model} {serial}", 180);
+    }
+
+    private static string? NormalizeBarcodeScan(string? barcodeScan)
+    {
+        if (string.IsNullOrWhiteSpace(barcodeScan))
+        {
+            return null;
+        }
+
+        var normalized = barcodeScan.Trim().TrimStart('.');
+        return string.IsNullOrWhiteSpace(normalized) ? null : TrimTo(normalized, 180);
     }
 
     private static string? NormalizeResult(string? value)
@@ -1827,7 +1839,7 @@ DEALLOCATE PREPARE stmt;");
         }
 
         var (barcodeEngineModel, barcodeEngineNumber) = ParseBarcodeScan(barcodeScan);
-        var barcodeTerm = barcodeScan?.Trim();
+        var barcodeTerm = NormalizeBarcodeScan(barcodeScan);
         var hasBarcodeEngineModel = !string.IsNullOrWhiteSpace(barcodeEngineModel);
         var hasBarcodeEngineNumber = !string.IsNullOrWhiteSpace(barcodeEngineNumber);
         var parsedBarcodeEngineModel = barcodeEngineModel ?? string.Empty;
@@ -2138,7 +2150,12 @@ WHERE judgement_code > 10");
             return (null, null);
         }
 
-        var normalized = barcodeScan.Trim().TrimStart('.');
+        var normalized = NormalizeBarcodeScan(barcodeScan);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return (null, null);
+        }
+
         var separatorIndex = normalized.IndexOfAny(new[] { ' ', '\t', '\r', '\n' });
         if (separatorIndex < 0)
         {
