@@ -12,6 +12,7 @@ const labelClass = "text-xs font-bold uppercase text-slate-600 dark:text-slate-3
 const backupActionClass = "inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800";
 const tableInputClass = "h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-400 focus:ring-3 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500";
 type PageMessage = { kind: "ok" | "error"; text: string };
+const showJudgementMaster = false;
 
 export default function SettingPage() {
   const [settings, setSettings] = useState<SystemSettings>(() => readSystemSettings());
@@ -36,6 +37,10 @@ export default function SettingPage() {
   }, []);
 
   useEffect(() => {
+    if (!showJudgementMaster) {
+      return;
+    }
+
     let ignore = false;
 
     async function loadJudgements() {
@@ -255,6 +260,7 @@ export default function SettingPage() {
         </div>
       </form>
 
+      {showJudgementMaster ? (
       <section className="mx-4 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="border-b border-slate-200 px-5 py-5 dark:border-slate-800">
           <h2 className="text-base font-bold text-slate-900 dark:text-white">Judgement Master</h2>
@@ -335,6 +341,7 @@ export default function SettingPage() {
           </table>
         </div>
       </section>
+      ) : null}
       </div>
 
       <ConfirmModal
