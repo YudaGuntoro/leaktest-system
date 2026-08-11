@@ -4,11 +4,10 @@ SETLOCAL EnableExtensions EnableDelayedExpansion
 SET "ROOT_DIR=%~dp0"
 SET "ROOT_DIR=%ROOT_DIR:~0,-1%"
 SET "FRONTEND_DIR=%ROOT_DIR%\Frontend"
-SET "REMOTE_URL=https://github.com/YudaGuntoro/leaktest-system.git"
+SET "REMOTE=origin"
 SET "BRANCH=main"
 SET "PM2_APP_NAME=LeakTesterFrontend"
 SET "PORT=3000"
-SET "TEMP_REPO=%TEMP%\LeakTesterFrontendUpdate"
 
 IF NOT "%~1"=="" SET "BRANCH=%~1"
 IF NOT "%~2"=="" SET "PORT=%~2"
@@ -17,7 +16,7 @@ echo ============================================================
 echo LeakTester Frontend App Update
 echo Root: %ROOT_DIR%
 echo Frontend: %FRONTEND_DIR%
-echo Source: %REMOTE_URL% [%BRANCH%]
+echo Source: %REMOTE%/%BRANCH%
 echo PM2 App: %PM2_APP_NAME%
 echo Port: %PORT%
 echo ============================================================
@@ -38,23 +37,14 @@ IF ERRORLEVEL 1 (
 )
 
 echo.
-echo Preparing temporary source folder...
-IF EXIST "%TEMP_REPO%" (
-    rmdir /s /q "%TEMP_REPO%"
-    IF EXIST "%TEMP_REPO%" (
-        echo ERROR: Failed to remove temporary folder:
-        echo %TEMP_REPO%
-        GOTO Failed
-    )
-)
-
-echo.
-echo Downloading latest source...
-git clone --branch "%BRANCH%" --depth 1 "%REMOTE_URL%" "%TEMP_REPO%"
+echo Pulling latest source...
+git fetch "%REMOTE%" "%BRANCH%"
 IF ERRORLEVEL 1 GOTO Failed
 
-IF NOT EXIST "%TEMP_REPO%\Frontend\package.json" (
-    echo ERROR: Downloaded source does not contain Frontend\package.json.
+git pull --ff-only "%REMOTE%" "%BRANCH%"
+IF ERRORLEVEL 1 (
+    echo.
+    echo ERROR: Pull failed. Commit or stash local changes, then run this BAT again.
     GOTO Failed
 )
 
@@ -63,14 +53,13 @@ echo Stopping old frontend process if running...
 pm2 describe "%PM2_APP_NAME%" >nul 2>&1
 IF NOT ERRORLEVEL 1 (
     pm2 delete "%PM2_APP_NAME%"
+) ELSE (
+    echo Old frontend process was not found. Continue to build.
 )
 
-echo.
-echo Copying frontend files only...
-IF NOT EXIST "%FRONTEND_DIR%" mkdir "%FRONTEND_DIR%"
-robocopy "%TEMP_REPO%\Frontend" "%FRONTEND_DIR%" /MIR /XD node_modules .next /XF .env .env.local /R:2 /W:2
-IF %ERRORLEVEL% GEQ 8 (
-    echo ERROR: Failed to copy frontend files. Robocopy code: %ERRORLEVEL%
+IF NOT EXIST "%FRONTEND_DIR%\package.json" (
+    echo ERROR: Frontend package.json was not found:
+    echo %FRONTEND_DIR%\package.json
     GOTO Failed
 )
 
@@ -100,11 +89,6 @@ IF ERRORLEVEL 1 GOTO Failed
 
 pm2 save
 IF ERRORLEVEL 1 GOTO Failed
-
-echo.
-echo Cleaning temporary source folder...
-cd /d "%ROOT_DIR%" >nul 2>&1
-rmdir /s /q "%TEMP_REPO%" >nul 2>&1
 
 echo.
 echo ============================================================
