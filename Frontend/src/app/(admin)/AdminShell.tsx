@@ -7,6 +7,8 @@ import AppSidebar from "@/layout/AppSidebar";
 import Backdrop from "@/layout/Backdrop";
 import type { ReactNode } from "react";
 
+const appVersion = "v.11.08.26";
+
 export default function AdminShell({ children }: { children: ReactNode }) {
   const { isExpanded, isHovered, isMobileOpen } = useSidebar();
 
@@ -24,6 +26,9 @@ export default function AdminShell({ children }: { children: ReactNode }) {
         <div className={`flex-1 transition-all duration-300 ease-in-out ${mainContentMargin}`}>
           <AppHeader />
           <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">{children}</div>
+        </div>
+        <div className="pointer-events-none fixed bottom-3 right-4 z-50 rounded border border-slate-200 bg-white/85 px-2 py-1 text-[11px] font-bold text-slate-500 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-400">
+          {appVersion}
         </div>
       </div>
     </AuthGuard>

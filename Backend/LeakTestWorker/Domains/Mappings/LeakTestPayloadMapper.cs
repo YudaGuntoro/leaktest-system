@@ -24,6 +24,9 @@ public static class LeakTestPayloadMapper
         "barcode",
         "Barcode",
         "channel_no",
+        "par_press_up",
+        "par_press_low",
+        "press_in_result",
         "press_set_up",
         "press_set_low",
         "pressure_input",
@@ -55,8 +58,8 @@ public static class LeakTestPayloadMapper
         var checkDate = serverNow.Date;
         var checkTime = serverNow.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
 
-        var pressSetUp = ReadDecimal(message.Data, "press_set_up", "pressSetUp", "PressSetUp", "upper_press_limit", "UpperPressLimit", "tp_ul", "TP_UL");
-        var pressSetLow = ReadDecimal(message.Data, "press_set_low", "pressSetLow", "PressSetLow", "lower_press_limit", "LowerPressLimit", "tp_ll", "TP_LL");
+        var pressSetUp = ReadDecimal(message.Data, "press_set_up", "pressSetUp", "PressSetUp", "upper_press_limit", "UpperPressLimit", "tp_ul", "TP_UL", "par_press_up");
+        var pressSetLow = ReadDecimal(message.Data, "press_set_low", "pressSetLow", "PressSetLow", "lower_press_limit", "LowerPressLimit", "tp_ll", "TP_LL", "par_press_low");
         var parameterPressure = ReadDecimal(message.Data, "parameter_pressure", "parameterPressure", "ParameterPressure", "set_pressure", "SetPressure", "target_pressure", "TargetPressure", "pressure_setting", "PressureSetting")
             ?? CalculateParameterPressure(pressSetLow, pressSetUp);
 
@@ -84,7 +87,7 @@ public static class LeakTestPayloadMapper
             ParameterPressure = parameterPressure ?? 0,
             PressSetUp = pressSetUp,
             PressSetLow = pressSetLow,
-            PressureInput = NormalizeCosmoPressure(ReadDecimal(message.Data, "pressure_input", "pressureInput", "PressureInput", "press_input", "actual_pressure", "ActualPressure", "leak_pressure", "LeakPressure") ?? 0),
+            PressureInput = ReadDecimal(message.Data, "pressure_input", "pressureInput", "PressureInput", "press_input", "press_in_result", "actual_pressure", "ActualPressure", "leak_pressure", "LeakPressure") ?? 0,
             CycleTimeLeakTestMinutes = ReadCycleTime(message.Data) ?? 0,
             JudgementCode = judgementCode
         };
@@ -116,7 +119,7 @@ public static class LeakTestPayloadMapper
 
     private static string? ReadString(JObject source, params string[] names)
     {
-        var token = ReadToken(source, names);
+        var token = UnwrapSingleValue(ReadToken(source, names));
         var value = token?.Type == JTokenType.String
             ? token.Value<string>()
             : token?.ToString();
@@ -165,7 +168,7 @@ public static class LeakTestPayloadMapper
 
     private static int? ReadInt(JObject source, params string[] names)
     {
-        var token = ReadToken(source, names);
+        var token = UnwrapSingleValue(ReadToken(source, names));
         if (token is null || token.Type == JTokenType.Null)
         {
             return null;
@@ -184,7 +187,7 @@ public static class LeakTestPayloadMapper
 
     private static decimal? ReadDecimal(JObject source, params string[] names)
     {
-        var token = ReadToken(source, names);
+        var token = UnwrapSingleValue(ReadToken(source, names));
         if (token is null || token.Type == JTokenType.Null)
         {
             return null;
@@ -239,24 +242,29 @@ public static class LeakTestPayloadMapper
         return null;
     }
 
+    private static JToken? UnwrapSingleValue(JToken? token)
+    {
+        if (token is JArray array)
+        {
+            return array.FirstOrDefault(item => item.Type != JTokenType.Null);
+        }
+
+        return token;
+    }
+
     private static decimal? CalculateParameterPressure(decimal? pressSetLow, decimal? pressSetUp)
     {
         if (pressSetLow.HasValue && pressSetUp.HasValue)
         {
-            return Math.Round((NormalizeCosmoPressure(pressSetLow.Value) + NormalizeCosmoPressure(pressSetUp.Value)) / 2, 2);
+            return Math.Round((pressSetLow.Value + pressSetUp.Value) / 2, 2);
         }
 
         if (pressSetLow.HasValue)
         {
-            return NormalizeCosmoPressure(pressSetLow.Value);
+            return pressSetLow.Value;
         }
 
-        return pressSetUp.HasValue ? NormalizeCosmoPressure(pressSetUp.Value) : null;
-    }
-
-    private static decimal NormalizeCosmoPressure(decimal value)
-    {
-        return Math.Abs(value) >= 10 ? Math.Round(value / 100, 2) : value;
+        return pressSetUp;
     }
 
     private static void Validate(LeakTestHistoryRecord record)

@@ -1540,8 +1540,8 @@ DEALLOCATE PREPARE stmt;");
             record.BarcodeScan = FirstText(record.BarcodeScan, BuildBarcodeScan(record.EngineModelName, record.EngineNumber));
             record.ParameterChannelNo = context?.ChannelNo ?? FirstText(record.ChannelNo);
             record.ParameterStandard = context?.Standard ?? FormatNormalizedPressure(record.ParameterPressure);
-            record.ParameterMin = context?.Min ?? (record.PressSetLow.HasValue ? FormatNormalizedPressure(record.PressSetLow.Value) : null);
-            record.ParameterMax = context?.Max ?? (record.PressSetUp.HasValue ? FormatNormalizedPressure(record.PressSetUp.Value) : null);
+            record.ParameterMin = FirstText(context?.Min, record.PressSetLow.HasValue ? FormatNormalizedPressure(record.PressSetLow.Value) : null);
+            record.ParameterMax = FirstText(context?.Max, record.PressSetUp.HasValue ? FormatNormalizedPressure(record.PressSetUp.Value) : null);
             record.ParameterLimit = context?.Limit ?? FormatHmiPressureLimit(record.PressSetLow, record.PressSetUp);
             record.Result = EvaluateWorkRecordResult(record);
         }
@@ -1559,12 +1559,10 @@ DEALLOCATE PREPARE stmt;");
 
     private static string EvaluateWorkRecordResult(LeakTestWorkRecord record)
     {
-        var lowerLimit = record.PressSetLow.HasValue
-            ? NormalizeCosmoPressure(record.PressSetLow.Value)
-            : ParsePressureValue(record.ParameterMin);
-        var upperLimit = record.PressSetUp.HasValue
-            ? NormalizeCosmoPressure(record.PressSetUp.Value)
-            : ParsePressureValue(record.ParameterMax);
+        var lowerLimit = ParsePressureValue(record.ParameterMin) ??
+            (record.PressSetLow.HasValue ? NormalizeCosmoPressure(record.PressSetLow.Value) : null);
+        var upperLimit = ParsePressureValue(record.ParameterMax) ??
+            (record.PressSetUp.HasValue ? NormalizeCosmoPressure(record.PressSetUp.Value) : null);
 
         return EvaluateWorkRecordResult(record.PressureInput, lowerLimit, upperLimit);
     }
