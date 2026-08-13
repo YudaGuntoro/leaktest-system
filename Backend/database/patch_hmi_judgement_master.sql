@@ -25,7 +25,17 @@ VALUES
     (7, '', '', '', 0),
     (8, '', '', '', 0),
     (9, '', '', '', 0),
-    (10, '', '', '', 0)
+    (10, '', '', '', 0),
+    (11, '', '', '', 0),
+    (12, '', '', '', 0),
+    (13, '', '', '', 0),
+    (14, '', '', '', 0),
+    (15, '', '', '', 0),
+    (16, '', '', '', 0),
+    (17, '', '', '', 0),
+    (18, '', '', '', 0),
+    (19, '', '', '', 0),
+    (20, '', '', '', 0)
 ON DUPLICATE KEY UPDATE
     judgement_name = VALUES(judgement_name),
     result = VALUES(result),
@@ -35,4 +45,4 @@ ON DUPLICATE KEY UPDATE
 
 UPDATE leak_test_judgements
 SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP
-WHERE judgement_code > 10;
+WHERE judgement_code > 20;

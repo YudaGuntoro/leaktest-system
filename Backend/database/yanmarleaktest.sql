@@ -81,3 +81,4 @@ SOURCE Backend/Web.API.Persistence/Migrations/20260810_008_limit_judgement_maste
 SOURCE Backend/Web.API.Persistence/Migrations/20260810_009_work_record_judgement_snapshot.sql;
 SOURCE Backend/Web.API.Persistence/Migrations/20260810_010_drop_work_record_judgement_name.sql;
 SOURCE Backend/Web.API.Persistence/Migrations/20260810_011_drop_work_record_result.sql;
+SOURCE Backend/Web.API.Persistence/Migrations/20260813_001_judgement_master_20_codes.sql;
