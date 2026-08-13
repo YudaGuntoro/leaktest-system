@@ -213,6 +213,10 @@ public class LeakTestWorkRecord
     [JsonPropertyName("operator_name")]
     public string? OperatorName { get; set; }
 
+    [NotMapped]
+    [JsonPropertyName("operator_code")]
+    public string? OperatorCode { get; set; }
+
     [JsonPropertyName("parameter_pressure")]
     public decimal ParameterPressure { get; set; }
 

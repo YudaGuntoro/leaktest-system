@@ -23,6 +23,9 @@ public static class LeakTestPayloadMapper
         "serial no",
         "barcode",
         "Barcode",
+        "operator",
+        "operator_code",
+        "OperatorCode",
         "channel_no",
         "par_press_up",
         "par_press_low",
@@ -82,7 +85,7 @@ public static class LeakTestPayloadMapper
             CheckTime = checkTime,
             MachineName = ReadString(message.Data, "machine_name", "machineName", "MachineName", "machine", "Machine", "line", "Line", "LineNo")
                 ?? SignalHelper.TopicToMachineName(message.Topic),
-            Operator = ReadString(message.Data, "operator", "Operator", "operator_name", "operatorName", "OperatorName", "operator_code", "operatorCode", "OperatorCode"),
+            Operator = ReadString(message.Data, "operator_code", "operatorCode", "OperatorCode", "operator", "Operator", "operator_name", "operatorName", "OperatorName"),
             ChannelNo = ReadString(message.Data, "channel_no", "channelNo", "ChannelNo", "channel", "Channel"),
             ParameterPressure = parameterPressure ?? 0,
             PressSetUp = pressSetUp,

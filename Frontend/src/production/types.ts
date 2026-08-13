@@ -59,6 +59,7 @@ export type LeakTestWorkRecord = {
   check_date: string;
   check_time: string;
   machine_name: string;
+  operator_code?: string | null;
   operator_name?: string | null;
   parameter_pressure: number;
   press_set_up?: number | null;

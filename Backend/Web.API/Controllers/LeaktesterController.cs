@@ -948,14 +948,26 @@ public class LeaktesterController : ApiControllerBase
                 throw new ArgumentException("Operator name is required.");
             }
 
+            if (string.IsNullOrWhiteSpace(request.OperatorCode))
+            {
+                throw new ArgumentException("Operator code is required.");
+            }
+
             var item = await _db.Operators.FirstOrDefaultAsync(x => x.Id == id);
             if (item is null)
             {
                 return ApiNotFound("Operator was not found.");
             }
 
+            var operatorCode = TrimTo(request.OperatorCode.Trim(), 50);
             var operatorName = request.OperatorName.Trim();
+            var codeExists = await _db.Operators.AnyAsync(x => x.Id != id && x.OperatorCode == operatorCode);
+            if (codeExists)
+            {
+                throw new ArgumentException("Operator code already exists.");
+            }
 
+            item.OperatorCode = operatorCode;
             item.OperatorName = operatorName;
             item.Department = string.IsNullOrWhiteSpace(request.Department) ? null : request.Department.Trim();
             item.Note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim();
@@ -1532,6 +1544,7 @@ DEALLOCATE PREPARE stmt;");
         }
 
         await HydrateWorkRecordJudgementsAsync(records);
+        await HydrateWorkRecordOperatorsAsync(records);
 
         var parameters = await GetActiveLeakTestParametersAsync();
         foreach (var record in records)
@@ -1638,6 +1651,61 @@ DEALLOCATE PREPARE stmt;");
                 record.JudgementName = judgementName;
             }
         }
+    }
+
+    private async Task HydrateWorkRecordOperatorsAsync(IReadOnlyCollection<LeakTestWorkRecord> records)
+    {
+        var operatorTexts = records
+            .Select(x => FirstText(x.OperatorName))
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (operatorTexts.Count == 0)
+        {
+            return;
+        }
+
+        var operators = await _db.Operators
+            .AsNoTracking()
+            .Where(x => x.IsDeleted != true &&
+                (operatorTexts.Contains(x.OperatorCode) || operatorTexts.Contains(x.OperatorName)))
+            .Select(x => new { x.OperatorCode, x.OperatorName })
+            .ToListAsync();
+
+        foreach (var record in records)
+        {
+            var operatorText = FirstText(record.OperatorName);
+            if (string.IsNullOrWhiteSpace(operatorText))
+            {
+                continue;
+            }
+
+            var matchedOperator = operators.FirstOrDefault(x =>
+                string.Equals(x.OperatorCode, operatorText, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(x.OperatorName, operatorText, StringComparison.OrdinalIgnoreCase));
+
+            if (matchedOperator is not null)
+            {
+                record.OperatorCode = matchedOperator.OperatorCode;
+                record.OperatorName = matchedOperator.OperatorName;
+                continue;
+            }
+
+            if (LooksLikeOperatorCode(operatorText))
+            {
+                record.OperatorCode = operatorText;
+                record.OperatorName = null;
+            }
+        }
+    }
+
+    private static bool LooksLikeOperatorCode(string value)
+    {
+        return value.StartsWith("LT-OP-", StringComparison.OrdinalIgnoreCase) ||
+               value.StartsWith("HMI-", StringComparison.OrdinalIgnoreCase) ||
+               value.All(char.IsDigit);
     }
 
     private async Task HydrateReworkEngineParameterContextAsync(IReadOnlyCollection<ReworkEngineRecord> records)

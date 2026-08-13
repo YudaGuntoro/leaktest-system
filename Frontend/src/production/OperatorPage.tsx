@@ -256,6 +256,7 @@ export default function OperatorPage() {
 
     try {
       const payload = {
+        operator_code: form.get("operator_code"),
         operator_name: form.get("operator_name"),
         department: form.get("department"),
         note: form.get("note"),
@@ -450,9 +451,7 @@ export default function OperatorPage() {
             {editingOperator ? (
               <div className="text-sm font-bold text-slate-700 dark:text-white">
                 Operator Code
-                <div className="mt-2 flex h-10 w-full items-center rounded-lg border border-slate-300 bg-slate-100 px-3 text-sm font-black text-slate-700 dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-300">
-                  {editingOperator.operator_code}
-                </div>
+                <input className={`${modalInputClass} font-black`} defaultValue={editingOperator.operator_code} name="operator_code" placeholder="Enter operator code" required />
               </div>
             ) : (
               <div className="rounded-lg border border-brand-500/30 bg-brand-500/10 px-4 py-3 text-sm font-bold text-brand-700 dark:text-brand-100">

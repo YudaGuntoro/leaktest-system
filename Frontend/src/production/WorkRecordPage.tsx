@@ -550,13 +550,14 @@ export default function WorkRecordPage() {
         </div>
 
         <div className="overflow-x-auto px-3 pb-3 pt-3">
-          <table className="leak-rounded-header-table w-full min-w-[1360px] border-separate border-spacing-0 text-left text-sm">
+          <table className="leak-rounded-header-table w-full min-w-[1480px] border-separate border-spacing-0 text-left text-sm">
             <thead className="bg-transparent text-xs uppercase text-white">
               <tr className="bg-transparent">
                 <th className="rounded-l-lg bg-brand-500 px-5 py-3">Engine Model</th>
                 <th className="bg-brand-500 px-4 py-3">Serial No</th>
                 <th className="bg-brand-500 px-4 py-3">Barcode Scan</th>
-                <th className="bg-brand-500 px-4 py-3">Operator</th>
+                <th className="bg-brand-500 px-4 py-3">Operator Code</th>
+                <th className="bg-brand-500 px-4 py-3">Operator Name</th>
                 <th className="bg-brand-500 px-4 py-3">Date</th>
                 <th className="bg-brand-500 px-4 py-3">Time</th>
                 <th className="bg-brand-500 px-4 py-3">Channel</th>
@@ -588,6 +589,7 @@ export default function WorkRecordPage() {
                     <td className="px-5 py-4 font-bold text-slate-900 dark:text-white">{record.engine_model}</td>
                     <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{record.engine_number}</td>
                     <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{displayBarcode(record)}</td>
+                    <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{record.operator_code || "-"}</td>
                     <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{record.operator_name || "-"}</td>
                     <td className="px-4 py-4 font-semibold text-slate-600 dark:text-slate-300">{displayDate(record.check_date)}</td>
                     <td className="px-4 py-4 font-semibold text-slate-600 dark:text-slate-300">{displayTime(record.check_time)}</td>
@@ -675,7 +677,8 @@ export default function WorkRecordPage() {
               <DetailItem label="Barcode Scan" value={displayBarcode(selectedRecord)} />
               <DetailItem label="Date" value={displayDate(selectedRecord.check_date)} />
               <DetailItem label="Time" value={displayTime(selectedRecord.check_time)} />
-              <DetailItem label="Operator" value={selectedRecord.operator_name || "-"} />
+              <DetailItem label="Operator Code" value={selectedRecord.operator_code || "-"} />
+              <DetailItem label="Operator Name" value={selectedRecord.operator_name || "-"} />
               <DetailItem label="Channel No" value={parameterContext.channelNo} />
               <DetailItem label={`Pressure Limit (TP LL ~ TP UL) (${pressureUnit})`} value={displayUnitlessText(parameterContext.limit)} />
               <DetailItem label={`Pressure Setting (${pressureUnit})`} value={displayNumber(selectedRecord.parameter_pressure)} />

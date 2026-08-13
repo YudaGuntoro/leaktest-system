@@ -702,11 +702,13 @@ export default function ProductionDashboard() {
           <Link className="text-sm font-bold text-brand-600 hover:text-brand-700" href="/work-record">Work record -&gt;</Link>
         </div>
         <div className="overflow-x-auto px-3 pb-3">
-          <table className="leak-rounded-header-table w-full min-w-[820px] border-separate border-spacing-0 text-left text-sm">
+          <table className="leak-rounded-header-table w-full min-w-[1040px] border-separate border-spacing-0 text-left text-sm">
             <thead className="bg-transparent text-[11px] uppercase tracking-wider text-white">
               <tr className="bg-transparent">
                 <th className="rounded-l-lg bg-brand-500 px-5 py-3">Engine Model</th>
                 <th className="bg-brand-500 px-4 py-3">Engine Number</th>
+                <th className="bg-brand-500 px-4 py-3">Operator Code</th>
+                <th className="bg-brand-500 px-4 py-3">Operator Name</th>
                 <th className="bg-brand-500 px-4 py-3">Date / Time</th>
                 <th className="bg-brand-500 px-4 py-3">Pressure Input ({pressureUnit})</th>
                 <th className="rounded-r-lg bg-brand-500 px-5 py-3">Judgement</th>
@@ -717,6 +719,8 @@ export default function ProductionDashboard() {
                 <tr className="transition hover:bg-slate-50 dark:hover:bg-slate-800/50" key={record.id}>
                   <td className="px-5 py-4 font-bold text-slate-900 dark:text-white">{record.engine_model}</td>
                   <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{record.engine_number}</td>
+                  <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{record.operator_code || "-"}</td>
+                  <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{record.operator_name || "-"}</td>
                   <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{displayDate(record.check_date)} / {displayTime(record.check_time)}</td>
                   <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{displayNumber(record.pressure_input)}</td>
                   <td className="px-5 py-4">
