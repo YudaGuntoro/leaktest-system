@@ -7,7 +7,7 @@ import AppSidebar from "@/layout/AppSidebar";
 import Backdrop from "@/layout/Backdrop";
 import type { ReactNode } from "react";
 
-const appVersion = "v.11.08.26";
+const appVersion = "v.13.08.26";
 
 export default function AdminShell({ children }: { children: ReactNode }) {
   const { isExpanded, isHovered, isMobileOpen } = useSidebar();
