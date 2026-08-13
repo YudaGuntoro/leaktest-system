@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using ClosedXML.Excel;
 using System.Globalization;
 using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using Web.API.Domain.Production;
 using Web.API.Persistence.Context;
 using Web.API.Reports;
@@ -1081,6 +1082,30 @@ public class LeaktesterController : ApiControllerBase
             {
                 plc_ip_address = plcIpAddress,
                 configured = !string.IsNullOrWhiteSpace(plcIpAddress),
+                online = isOnline,
+                checked_at = DateTime.Now
+            });
+        }
+        catch (Exception ex)
+        {
+            return ApiBadRequest(ex);
+        }
+    }
+
+    [AllowAnonymous]
+    [HttpGet("mqtt-broker/status")]
+    public async Task<IActionResult> MqttBrokerStatus()
+    {
+        try
+        {
+            var settings = LoadMqttBrokerStatusSettings();
+            var isOnline = await CheckTcpReachableAsync(settings.Host, settings.Port);
+
+            return ApiOk(new
+            {
+                host = settings.Host,
+                port = settings.Port,
+                configured = true,
                 online = isOnline,
                 checked_at = DateTime.Now
             });
@@ -2353,6 +2378,109 @@ CREATE TABLE IF NOT EXISTS system_settings (
             return false;
         }
     }
+
+    private static async Task<bool> CheckTcpReachableAsync(string host, int port)
+    {
+        if (string.IsNullOrWhiteSpace(host) || port <= 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            using var client = new TcpClient();
+            var connectTask = client.ConnectAsync(host, port);
+            var completedTask = await Task.WhenAny(connectTask, Task.Delay(1000));
+            if (completedTask != connectTask)
+            {
+                return false;
+            }
+
+            await connectTask;
+            return client.Connected;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static MqttBrokerStatusSettings LoadMqttBrokerStatusSettings()
+    {
+        var settingsPath = ResolveMqttBrokerSettingsPath();
+        var host = ReadIniValue(settingsPath, "Broker", "Host") ?? "localhost";
+        var portText = ReadIniValue(settingsPath, "Broker", "Port");
+        var port = int.TryParse(portText, out var parsedPort) && parsedPort > 0
+            ? parsedPort
+            : 1883;
+
+        if (host == "0.0.0.0" || host == "::")
+        {
+            host = "localhost";
+        }
+
+        return new MqttBrokerStatusSettings(host, port);
+    }
+
+    private static string ResolveMqttBrokerSettingsPath()
+    {
+        var candidatePaths = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, "Settings.ini"),
+            Path.Combine(Directory.GetCurrentDirectory(), "Backend", "MqttBrokerService", "Settings.ini"),
+            Path.Combine(Directory.GetCurrentDirectory(), "MqttBrokerService", "Settings.ini"),
+            Path.Combine(Directory.GetCurrentDirectory(), "Settings.ini")
+        };
+
+        return candidatePaths.FirstOrDefault(System.IO.File.Exists) ?? candidatePaths[0];
+    }
+
+    private static string? ReadIniValue(string path, string section, string key)
+    {
+        if (!System.IO.File.Exists(path))
+        {
+            return null;
+        }
+
+        var currentSection = string.Empty;
+        foreach (var rawLine in System.IO.File.ReadLines(path))
+        {
+            var line = rawLine.Trim();
+            if (line.Length == 0 || line.StartsWith(';') || line.StartsWith('#'))
+            {
+                continue;
+            }
+
+            if (line.StartsWith('[') && line.EndsWith(']'))
+            {
+                currentSection = line[1..^1].Trim();
+                continue;
+            }
+
+            if (!string.Equals(currentSection, section, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var separatorIndex = line.IndexOf('=');
+            if (separatorIndex <= 0)
+            {
+                continue;
+            }
+
+            var entryKey = line[..separatorIndex].Trim();
+            var entryValue = line[(separatorIndex + 1)..].Trim();
+            if (string.Equals(entryKey, key, StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(entryValue))
+            {
+                return entryValue;
+            }
+        }
+
+        return null;
+    }
+
+    private sealed record MqttBrokerStatusSettings(string Host, int Port);
 
     private async Task<int> FindOrCreateMeasurementUnitAsync(string category, string? symbol, string? name)
     {

@@ -19,6 +19,15 @@ public sealed class MqttBrokerWorker : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var settings = BrokerSettings.Load();
+        _logger.LogInformation(
+            "[MQTT Broker] Starting. BaseDirectory={BaseDirectory} SettingsPath={SettingsPath} Host={Host} ParsedHost={ParsedHost} Port={Port} Auth={AuthMode}",
+            AppContext.BaseDirectory,
+            BrokerSettings.SettingsPath,
+            settings.HostText,
+            settings.Host,
+            settings.Port,
+            settings.RequiresAuthentication ? "Enabled" : "Disabled");
+
         var options = new MqttServerOptionsBuilder()
             .WithDefaultEndpoint()
             .WithDefaultEndpointBoundIPAddress(settings.Host)
@@ -66,7 +75,21 @@ public sealed class MqttBrokerWorker : BackgroundService
             return Task.CompletedTask;
         };
 
-        await _mqttServer.StartAsync();
+        try
+        {
+            await _mqttServer.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogCritical(
+                ex,
+                "[MQTT Broker] Failed to start on {Host}:{Port}. Check whether port {Port} is already used or blocked.",
+                settings.HostText,
+                settings.Port,
+                settings.Port);
+            throw;
+        }
+
         _logger.LogInformation(
             "[MQTT Broker] Started on {Host}:{Port}. Auth={AuthMode}",
             settings.HostText,
@@ -106,7 +129,7 @@ public sealed class MqttBrokerWorker : BackgroundService
 
         public static BrokerSettings Load()
         {
-            var values = ReadIni(Path.Combine(AppContext.BaseDirectory, "Settings.ini"));
+            var values = ReadIni(SettingsPath);
             var hostText = Read(values, "Broker", "Host") ?? DefaultHost;
             var host = ParseHost(hostText);
             var port = int.TryParse(Read(values, "Broker", "Port"), out var parsedPort) && parsedPort > 0
@@ -117,6 +140,8 @@ public sealed class MqttBrokerWorker : BackgroundService
 
             return new BrokerSettings(hostText, host, port, username, password);
         }
+
+        public static string SettingsPath => Path.Combine(AppContext.BaseDirectory, "Settings.ini");
 
         private static System.Net.IPAddress ParseHost(string value)
         {
