@@ -1052,6 +1052,72 @@ public class LeaktesterController : ApiControllerBase
         }
     }
 
+    [HttpPut("engine-models/{id:int}")]
+    public async Task<IActionResult> UpdateEngineModel(int id, [FromBody] CreateEngineModelRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.ModelName))
+            {
+                throw new ArgumentException("Engine model is required.");
+            }
+
+            var item = await _db.EngineModels.FirstOrDefaultAsync(x => x.Id == id);
+            if (item is null)
+            {
+                return ApiNotFound("Engine model was not found.");
+            }
+
+            var modelName = request.ModelName.Trim();
+            var modelExists = await _db.EngineModels.AnyAsync(x => x.Id != id && x.ModelName == modelName);
+            if (modelExists)
+            {
+                throw new ArgumentException("Engine model already exists.");
+            }
+
+            item.ModelName = modelName;
+            item.Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
+            item.Note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim();
+            item.IsDeleted = request.IsDeleted ?? false;
+
+            await _db.SaveChangesAsync();
+            return ApiOk(item, "Engine model updated successfully.");
+        }
+        catch (Exception ex)
+        {
+            return ApiBadRequest(ex);
+        }
+    }
+
+    [HttpDelete("engine-models/{id:int}")]
+    public async Task<IActionResult> DeleteEngineModel(int id)
+    {
+        try
+        {
+            var item = await _db.EngineModels.FirstOrDefaultAsync(x => x.Id == id);
+            if (item is null)
+            {
+                return ApiNotFound("Engine model was not found.");
+            }
+
+            var hasWorkRecord = await _db.LeakTestWorkRecords
+                .AsNoTracking()
+                .AnyAsync(x => x.EngineModelId == id);
+            if (hasWorkRecord)
+            {
+                throw new InvalidOperationException("Tidak bisa dihapus, karena ada data di Leaktester Work Record.");
+            }
+
+            item.IsDeleted = true;
+            await _db.SaveChangesAsync();
+            return ApiOk(item, "Engine model deleted successfully.");
+        }
+        catch (Exception ex)
+        {
+            return ApiBadRequest(ex);
+        }
+    }
+
     [HttpGet("status")]
     public async Task<IActionResult> Status()
     {
