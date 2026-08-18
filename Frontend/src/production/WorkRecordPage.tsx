@@ -564,7 +564,6 @@ export default function WorkRecordPage() {
                 <th className="bg-brand-500 px-4 py-3">Pressure Limit (TP LL ~ TP UL) ({pressureUnit})</th>
                 <th className="bg-brand-500 px-4 py-3">Pressure Input ({pressureUnit})</th>
                 <th className="bg-brand-500 px-4 py-3">Cycle Time ({cycleTimeUnit})</th>
-                <th className="bg-brand-500 px-4 py-3">Judgement Name</th>
                 <th className="rounded-r-lg bg-brand-500 px-5 py-3">Result</th>
               </tr>
             </thead>
@@ -601,7 +600,6 @@ export default function WorkRecordPage() {
                       </span>
                     </td>
                     <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{record.cycle_time_leak_test_minutes}</td>
-                    <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{displayJudgement(record)}</td>
                     <td className="px-5 py-4">
                       <span className={`rounded-full px-3 py-1 text-xs font-black ${record.result === "OK" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300" : "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300"}`}>
                         {record.result}
