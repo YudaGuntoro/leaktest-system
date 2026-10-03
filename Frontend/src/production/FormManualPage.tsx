@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import DataTable, { type DataTableColumn } from "@/components/common/DataTable";
+import ClearFilterButton from "@/components/common/ClearFilterButton";
 import ExportButton from "@/components/common/ExportButton";
 import { ThemeToggleButton } from "@/components/common/ThemeToggleButton";
 import { Modal } from "@/components/ui/modal";
@@ -494,16 +495,26 @@ export default function FormManualPage({ publicAccess = false }: FormManualPageP
         <DataTable
           actions={
             <div className="flex flex-wrap items-end gap-3">
-              <ProductionDatePicker
-                defaultValue={filterDate}
-                label="Filter Date"
-                name="filter_date"
-                onChange={(value) => {
-                  setFilterDate(value);
-                  setPage(1);
-                }}
-                value={filterDate}
-              />
+              <div className="flex items-end gap-1.5">
+                <ProductionDatePicker
+                  defaultValue={filterDate}
+                  label="Filter Date"
+                  name="filter_date"
+                  onChange={(value) => {
+                    setFilterDate(value);
+                    setPage(1);
+                  }}
+                  value={filterDate}
+                />
+                <ClearFilterButton
+                  disabled={!filterDate}
+                  label="Clear date filter"
+                  onClick={() => {
+                    setFilterDate("");
+                    setPage(1);
+                  }}
+                />
+              </div>
               <label className={labelClass}>
                 Result
                 <select

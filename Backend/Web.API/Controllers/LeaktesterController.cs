@@ -1873,6 +1873,8 @@ DEALLOCATE PREPARE stmt;");
             return;
         }
 
+        await HydrateReworkEngineOperatorsAsync(records);
+
         var parameters = await GetActiveLeakTestParametersAsync();
         foreach (var record in records)
         {
@@ -1882,6 +1884,52 @@ DEALLOCATE PREPARE stmt;");
             record.ParameterMin = context?.Min;
             record.ParameterMax = context?.Max;
             record.ParameterLimit = context?.Limit;
+        }
+    }
+
+    private async Task HydrateReworkEngineOperatorsAsync(IReadOnlyCollection<ReworkEngineRecord> records)
+    {
+        var operatorTexts = records
+            .Select(x => FirstText(x.OperatorName))
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (operatorTexts.Count == 0)
+        {
+            return;
+        }
+
+        var operators = await _db.Operators
+            .AsNoTracking()
+            .Where(x => x.IsDeleted != true &&
+                (operatorTexts.Contains(x.OperatorCode) || operatorTexts.Contains(x.OperatorName)))
+            .Select(x => new { x.OperatorCode, x.OperatorName })
+            .ToListAsync();
+
+        foreach (var record in records)
+        {
+            var operatorText = FirstText(record.OperatorName);
+            if (string.IsNullOrWhiteSpace(operatorText))
+            {
+                continue;
+            }
+
+            var matchedOperator = operators.FirstOrDefault(x =>
+                string.Equals(x.OperatorCode, operatorText, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(x.OperatorName, operatorText, StringComparison.OrdinalIgnoreCase));
+
+            if (matchedOperator is not null)
+            {
+                record.OperatorName = matchedOperator.OperatorName;
+                continue;
+            }
+
+            if (LooksLikeOperatorCode(operatorText))
+            {
+                record.OperatorName = null;
+            }
         }
     }
 

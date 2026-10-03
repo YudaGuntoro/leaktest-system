@@ -473,8 +473,8 @@ export default function WorkRecordPage() {
             </span>
           </div>
 
-          <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,240px)_minmax(0,300px)_minmax(0,140px)_auto_minmax(0,250px)_auto] lg:items-end">
-            <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <label className="block w-full text-xs font-bold uppercase text-slate-500 dark:text-slate-400 sm:w-60">
               Engine Model
               <select
                 className={filterSelectClass}
@@ -490,7 +490,7 @@ export default function WorkRecordPage() {
                 ))}
               </select>
             </label>
-            <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
+            <label className="block w-full text-xs font-bold uppercase text-slate-500 dark:text-slate-400 sm:w-[300px]">
               Barcode Scan
               <input
                 className={filterInputClass}
@@ -502,7 +502,7 @@ export default function WorkRecordPage() {
                 value={barcodeScanFilter}
               />
             </label>
-            <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
+            <label className="block w-full text-xs font-bold uppercase text-slate-500 dark:text-slate-400 sm:w-36">
               Result
               <select
                 className={filterSelectClass}
@@ -518,7 +518,7 @@ export default function WorkRecordPage() {
               </select>
             </label>
             <ClearFilterButton disabled={!hasRecordFilters} label="Clear work record filters" onClick={clearRecordFilters} />
-            <div className="min-w-0">
+            <div className="w-full min-w-0 sm:w-[250px]">
               <div className="flex items-end gap-1.5">
                 <div className="min-w-0 flex-1">
                   <DatePicker
@@ -538,7 +538,7 @@ export default function WorkRecordPage() {
               </div>
             </div>
             <ExportButton
-              className="w-full lg:w-auto"
+              className="w-full sm:w-auto"
               disabled={exportingList}
               onClick={() => void handleExportWorkRecordList()}
             >
