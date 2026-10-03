@@ -15,6 +15,8 @@ namespace Web.API.Controllers;
 [Route("api/leaktester")]
 public class LeaktesterController : ApiControllerBase
 {
+    private const int ReworkTriggerNgCount = 3;
+
     private readonly AppDbContext _db;
     private readonly IWebHostEnvironment _environment;
 
@@ -217,6 +219,7 @@ public class LeaktesterController : ApiControllerBase
                 PressSetLow = request.PressSetLow,
                 PressureInput = request.PressureInput,
                 CycleTimeLeakTestMinutes = request.CycleTimeLeakTestMinutes,
+                JudgementCode = request.JudgementCode,
                 CreatedAt = DateTime.Now,
                 UpdatedAt = DateTime.Now
             };
@@ -225,6 +228,7 @@ public class LeaktesterController : ApiControllerBase
             await _db.SaveChangesAsync();
             record.EngineModel = engineModel;
             await HydrateWorkRecordParameterContextAsync(new[] { record });
+            await PromoteToReworkEngineIfNeededAsync(record);
             return ApiCreated(record, "Leak test work record saved successfully.");
         }
         catch (Exception ex)
@@ -304,6 +308,7 @@ public class LeaktesterController : ApiControllerBase
             await _db.SaveChangesAsync();
             record.EngineModel = engineModel;
             await HydrateWorkRecordParameterContextAsync(new[] { record });
+            await PromoteToReworkEngineIfNeededAsync(record);
             return ApiCreated(record, "HMI leak test work record saved successfully.");
         }
         catch (Exception ex)
@@ -1668,14 +1673,19 @@ DEALLOCATE PREPARE stmt;");
         var upperLimit = ParsePressureValue(record.ParameterMax) ??
             (record.PressSetUp.HasValue ? NormalizeCosmoPressure(record.PressSetUp.Value) : null);
 
-        return EvaluateWorkRecordResult(record.PressureInput, lowerLimit, upperLimit);
+        return EvaluateWorkRecordResult(record.PressureInput, lowerLimit, upperLimit, record.JudgementCode);
     }
 
-    private static string EvaluateWorkRecordResult(decimal pressureInput, decimal? lowerLimit, decimal? upperLimit)
+    private static string EvaluateWorkRecordResult(decimal pressureInput, decimal? lowerLimit, decimal? upperLimit, int? judgementCode)
     {
         var normalizedInput = NormalizeCosmoPressure(pressureInput);
         var normalizedLowerLimit = lowerLimit.HasValue ? NormalizeCosmoPressure(lowerLimit.Value) : (decimal?)null;
         var normalizedUpperLimit = upperLimit.HasValue ? NormalizeCosmoPressure(upperLimit.Value) : (decimal?)null;
+
+        if (judgementCode != 2)
+        {
+            return "NG";
+        }
 
         if (normalizedLowerLimit.HasValue && normalizedInput < normalizedLowerLimit.Value)
         {
@@ -1688,6 +1698,63 @@ DEALLOCATE PREPARE stmt;");
         }
 
         return "OK";
+    }
+
+    private async Task PromoteToReworkEngineIfNeededAsync(LeakTestWorkRecord record)
+    {
+        if (!string.Equals(record.Result, "NG", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        await EnsureReworkEngineRecordOperatorSnapshotColumnAsync();
+
+        var barcodeScan = NormalizeBarcodeScan(FirstText(record.BarcodeScan, BuildBarcodeScan(record.EngineModelName, record.EngineNumber)));
+        var duplicateExists = await _db.ReworkEngineRecords.AsNoTracking()
+            .AnyAsync(x =>
+                (!string.IsNullOrWhiteSpace(barcodeScan) && x.BarcodeScan == barcodeScan) ||
+                (x.EngineModelId == record.EngineModelId && x.EngineNumber == record.EngineNumber));
+
+        if (duplicateExists)
+        {
+            return;
+        }
+
+        var relatedRecords = await _db.LeakTestWorkRecords.AsNoTracking()
+            .Include(x => x.EngineModel)
+            .Where(x => x.EngineModelId == record.EngineModelId && x.EngineNumber == record.EngineNumber)
+            .OrderByDescending(x => x.CheckDate)
+            .ThenByDescending(x => x.CheckTime)
+            .ThenByDescending(x => x.Id)
+            .Take(50)
+            .ToListAsync();
+
+        await HydrateWorkRecordParameterContextAsync(relatedRecords);
+
+        var ngCount = relatedRecords.Count(x => string.Equals(x.Result, "NG", StringComparison.OrdinalIgnoreCase));
+        if (ngCount < ReworkTriggerNgCount)
+        {
+            return;
+        }
+
+        var rework = new ReworkEngineRecord
+        {
+            EngineModelId = record.EngineModelId,
+            EngineNumber = record.EngineNumber,
+            BarcodeScan = barcodeScan ?? BuildBarcodeScan(record.EngineModelName, record.EngineNumber) ?? record.EngineNumber,
+            ReworkDate = record.CheckDate.Date,
+            ReworkTime = NormalizeCheckTime(record.CheckTime),
+            OperatorName = string.IsNullOrWhiteSpace(record.OperatorName) ? null : TrimTo(record.OperatorName, 150),
+            ParameterPressure = record.ParameterPressure,
+            PressureInput = record.PressureInput,
+            Result = "NG",
+            Note = $"Auto rework after {ngCount} NG leak test records.",
+            CreatedAt = DateTime.Now,
+            UpdatedAt = DateTime.Now
+        };
+
+        _db.ReworkEngineRecords.Add(rework);
+        await _db.SaveChangesAsync();
     }
 
     private static decimal? ParsePressureValue(string? value)

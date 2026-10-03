@@ -39,23 +39,23 @@ export default function AuthLayout({
 
               <div>
                 <h2 className="text-5xl font-extrabold leading-tight tracking-normal text-white">
-                  Assembly
+                  Leak Test
                   <br />
                   <span className="text-[#df1f26]">System</span>
                 </h2>
                 <p className="mt-8 max-w-[390px] text-xl leading-8 text-white">
-                  Monitor production records, master data, parameters, and operational results in one dashboard.
+                  Monitor leak test records, master data, parameters, and inspection results in one dashboard.
                 </p>
               </div>
 
               <ul className="mt-9 space-y-5 text-base text-white">
-                <li className="flex items-center gap-3"><span className="size-2 rounded-full bg-[#df1f26]" />Production traceability</li>
-                <li className="flex items-center gap-3"><span className="size-2 rounded-full bg-[#df1f26]" />Master data and parameter control</li>
-                <li className="flex items-center gap-3"><span className="size-2 rounded-full bg-[#df1f26]" />OK/NG result monitoring</li>
+                <li className="flex items-center gap-3"><span className="size-2 rounded-full bg-[#df1f26]" />Leak test traceability</li>
+                <li className="flex items-center gap-3"><span className="size-2 rounded-full bg-[#df1f26]" />Master parameter control</li>
+                <li className="flex items-center gap-3"><span className="size-2 rounded-full bg-[#df1f26]" />OK/NG judgement monitoring</li>
               </ul>
 
               <div className="mt-12 h-px w-full max-w-sm bg-white/15" />
-              <p className="mt-9 max-w-sm text-lg italic leading-7 text-white">&quot;Accurate records for every assembly process&quot;</p>
+              <p className="mt-9 max-w-sm text-lg italic leading-7 text-white">&quot;Accurate records for every leak test process&quot;</p>
             </div>
           </div>
         </div>

@@ -8,6 +8,8 @@ namespace LeakTestWorker.MQTT.Handlers.SQL;
 
 public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
 {
+    private const int ReworkTriggerNgCount = 3;
+
     private readonly ILogger<LeakTestHistoryInsertService> _logger;
 
     public LeakTestHistoryInsertService(ILogger<LeakTestHistoryInsertService> logger)
@@ -28,6 +30,7 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
         await DbRetry.OpenWithRetryAsync(connection, _logger, "INSERT_HISTORY", cancellationToken);
         await EnsureHmiColumnsAsync(connection, cancellationToken);
         await EnsureJudgementMasterAsync(connection, cancellationToken);
+        await EnsureReworkEngineTableAsync(connection, cancellationToken);
 
         using var transaction = connection.BeginTransaction();
         try
@@ -67,6 +70,8 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
                 transaction: transaction,
                 cancellationToken: cancellationToken));
 
+            await PromoteToReworkEngineIfNeededAsync(connection, transaction, engineModelId, record, barcodeScan, cancellationToken);
+
             await transaction.CommitAsync(cancellationToken);
             return insertedId;
         }
@@ -75,6 +80,121 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
             await transaction.RollbackAsync(cancellationToken);
             throw;
         }
+    }
+
+    private static async Task PromoteToReworkEngineIfNeededAsync(
+        MySqlConnection connection,
+        MySqlTransaction transaction,
+        int engineModelId,
+        LeakTestHistoryRecord record,
+        string? barcodeScan,
+        CancellationToken cancellationToken)
+    {
+        if (EvaluateWorkRecordResult(record.PressureInput, record.PressSetLow, record.PressSetUp, record.JudgementCode) != "NG")
+        {
+            return;
+        }
+
+        var engineNumber = Clamp(record.EngineNumber, 120);
+        var duplicateExists = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            """
+            SELECT COUNT(*)
+            FROM rework_engine_records
+            WHERE (@barcode_scan IS NOT NULL AND barcode_scan = @barcode_scan)
+               OR (engine_model_id = @engine_model_id AND engine_number = @engine_number);
+            """,
+            new
+            {
+                barcode_scan = DbText(barcodeScan, 180),
+                engine_model_id = engineModelId,
+                engine_number = engineNumber
+            },
+            transaction,
+            cancellationToken: cancellationToken));
+
+        if (duplicateExists > 0)
+        {
+            return;
+        }
+
+        var relatedRecords = await connection.QueryAsync<WorkRecordResultRow>(new CommandDefinition(
+            """
+            SELECT pressure_input AS PressureInput,
+                   press_set_low AS PressSetLow,
+                   press_set_up AS PressSetUp,
+                   judgement_code AS JudgementCode
+            FROM leak_test_work_records
+            WHERE engine_model_id = @engine_model_id
+              AND engine_number = @engine_number
+            ORDER BY check_date DESC, check_time DESC, id DESC
+            LIMIT 50;
+            """,
+            new
+            {
+                engine_model_id = engineModelId,
+                engine_number = engineNumber
+            },
+            transaction,
+            cancellationToken: cancellationToken));
+
+        var ngCount = relatedRecords.Count(row =>
+            EvaluateWorkRecordResult(row.PressureInput, row.PressSetLow, row.PressSetUp, row.JudgementCode) == "NG");
+
+        if (ngCount < ReworkTriggerNgCount)
+        {
+            return;
+        }
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            """
+            INSERT INTO rework_engine_records
+                (engine_model_id, engine_number, barcode_scan, rework_date, rework_time, operator_name, parameter_pressure, pressure_input, result, note, created_at, updated_at)
+            VALUES
+                (@engine_model_id, @engine_number, @barcode_scan, @rework_date, @rework_time, @operator_name, @parameter_pressure, @pressure_input, 'NG', @note, NOW(), NOW());
+            """,
+            new
+            {
+                engine_model_id = engineModelId,
+                engine_number = engineNumber,
+                barcode_scan = DbText(FirstText(barcodeScan, BuildBarcodeScan(record.EngineModel, record.EngineNumber), record.EngineNumber) ?? record.EngineNumber, 180),
+                rework_date = record.CheckDate.Date,
+                rework_time = Clamp(record.CheckTime, 8),
+                operator_name = DbText(record.Operator, 150),
+                parameter_pressure = record.ParameterPressure,
+                pressure_input = record.PressureInput,
+                note = Clamp($"Auto rework after {ngCount} NG leak test records.", 255)
+            },
+            transaction,
+            cancellationToken: cancellationToken));
+    }
+
+    private static string EvaluateWorkRecordResult(decimal pressureInput, decimal? lowerLimit, decimal? upperLimit, int? judgementCode)
+    {
+        var normalizedInput = NormalizeCosmoPressure(pressureInput);
+        var normalizedLowerLimit = lowerLimit.HasValue ? NormalizeCosmoPressure(lowerLimit.Value) : (decimal?)null;
+        var normalizedUpperLimit = upperLimit.HasValue ? NormalizeCosmoPressure(upperLimit.Value) : (decimal?)null;
+
+        if (judgementCode != 2)
+        {
+            return "NG";
+        }
+
+        if (normalizedLowerLimit.HasValue && normalizedInput < normalizedLowerLimit.Value)
+        {
+            return "NG";
+        }
+
+        if (normalizedUpperLimit.HasValue && normalizedInput > normalizedUpperLimit.Value)
+        {
+            return "NG";
+        }
+
+        return "OK";
+    }
+
+    private static decimal NormalizeCosmoPressure(decimal value)
+    {
+        return Math.Abs(value) >= 10 ? Math.Round(value / 100, 2) : value;
     }
 
     private async Task<int> ResolveEngineModelIdAsync(
@@ -258,6 +378,38 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
             cancellationToken: cancellationToken));
     }
 
+    private static async Task EnsureReworkEngineTableAsync(MySqlConnection connection, CancellationToken cancellationToken)
+    {
+        await connection.ExecuteAsync(new CommandDefinition(
+            """
+            CREATE TABLE IF NOT EXISTS rework_engine_records (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                engine_model_id INT NULL,
+                engine_model_text VARCHAR(80) NULL,
+                engine_number VARCHAR(120) NOT NULL,
+                barcode_scan VARCHAR(180) NOT NULL,
+                rework_date DATE NOT NULL,
+                rework_time VARCHAR(8) NOT NULL,
+                operator_name VARCHAR(150) NULL,
+                parameter_pressure DECIMAL(8, 2) NOT NULL,
+                pressure_input DECIMAL(8, 2) NOT NULL,
+                result VARCHAR(10) NOT NULL,
+                note VARCHAR(255) NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                KEY ix_rework_engine_records_date_engine (rework_date, engine_number),
+                KEY ix_rework_engine_records_engine_model (engine_model_id),
+                CONSTRAINT fk_rework_engine_records_engine_model
+                    FOREIGN KEY (engine_model_id) REFERENCES engine_models (id)
+                    ON DELETE SET NULL
+            );
+            """,
+            cancellationToken: cancellationToken));
+
+        await EnsureReworkColumnAsync(connection, "operator_name", "ALTER TABLE rework_engine_records ADD COLUMN operator_name VARCHAR(150) NULL AFTER rework_time", cancellationToken);
+        await EnsureReworkColumnAsync(connection, "note", "ALTER TABLE rework_engine_records ADD COLUMN note VARCHAR(255) NULL AFTER result", cancellationToken);
+    }
+
     private static async Task EnsureColumnAsync(
         MySqlConnection connection,
         string columnName,
@@ -338,6 +490,33 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
             cancellationToken: cancellationToken));
     }
 
+    private static async Task EnsureReworkColumnAsync(
+        MySqlConnection connection,
+        string columnName,
+        string alterSql,
+        CancellationToken cancellationToken)
+    {
+        var count = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            """
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'rework_engine_records'
+              AND COLUMN_NAME = @column_name;
+            """,
+            new { column_name = columnName },
+            cancellationToken: cancellationToken));
+
+        if (count > 0)
+        {
+            return;
+        }
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            alterSql,
+            cancellationToken: cancellationToken));
+    }
+
     private static string Clamp(string value, int maxLength)
     {
         var trimmed = value.Trim();
@@ -367,5 +546,16 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
     private static string? DbText(string? value, int maxLength)
     {
         return string.IsNullOrWhiteSpace(value) ? null : Clamp(value, maxLength);
+    }
+
+    private sealed class WorkRecordResultRow
+    {
+        public decimal PressureInput { get; init; }
+
+        public decimal? PressSetLow { get; init; }
+
+        public decimal? PressSetUp { get; init; }
+
+        public int? JudgementCode { get; init; }
     }
 }

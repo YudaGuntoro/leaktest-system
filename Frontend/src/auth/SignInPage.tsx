@@ -88,9 +88,9 @@ export default function SignInPage() {
                     data-login-field="true"
                     data-lpignore="true"
                     disabled={loading}
-                    id={`production-user-${usernameFieldId}`}
+                    id={`leaktest-user-${usernameFieldId}`}
                     inputMode="text"
-                    name={fieldNonce ? `production-operator-${fieldNonce}` : `production-operator-${usernameFieldId}`}
+                    name={fieldNonce ? `leaktest-operator-${fieldNonce}` : `leaktest-operator-${usernameFieldId}`}
                     onChange={(event) => setUsername(event.target.value)}
                     onFocus={() => setAutofillLocked(false)}
                     placeholder="Username"
@@ -112,8 +112,8 @@ export default function SignInPage() {
                     data-login-field="true"
                     data-lpignore="true"
                     disabled={loading}
-                    id={`production-secret-${passwordFieldId}`}
-                    name={fieldNonce ? `production-key-${fieldNonce}` : `production-key-${passwordFieldId}`}
+                    id={`leaktest-secret-${passwordFieldId}`}
+                    name={fieldNonce ? `leaktest-key-${fieldNonce}` : `leaktest-key-${passwordFieldId}`}
                     onChange={(event) => setPassword(event.target.value)}
                     onFocus={() => setAutofillLocked(false)}
                     placeholder="Password"

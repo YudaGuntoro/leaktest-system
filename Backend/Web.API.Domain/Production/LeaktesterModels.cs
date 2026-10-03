@@ -488,6 +488,9 @@ public class CreateLeakTestWorkRecordRequest
     [JsonPropertyName("cycle_time_leak_test_minutes")]
     public decimal CycleTimeLeakTestMinutes { get; set; }
 
+    [JsonPropertyName("judgement_code")]
+    public int? JudgementCode { get; set; }
+
 }
 
 public class CreateHmiLeakTestWorkRecordRequest
