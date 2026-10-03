@@ -18,7 +18,6 @@ const ReactApexChart = dynamic(() => import("react-apexcharts"), {
 });
 const DEFAULT_TABLE_PAGE_SIZE = 10;
 const TABLE_PAGE_SIZE_OPTIONS = [10, 25, 50, 0];
-const REWORK_TRIGGER_NG_COUNT = 3;
 const datePickerInputClass = "h-10 rounded-lg border-gray-200 bg-white px-4 pr-10 text-sm font-black text-slate-900 shadow-theme-xs focus:border-brand-400 focus:ring-brand-400/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white";
 
 function MetricCard({
@@ -113,10 +112,16 @@ function summarizeEngineInspectionOutcomes(records: LeakTestWorkRecord[]): Engin
   });
 
   return Array.from(groups.values()).map((items) => {
-    const ngCount = items.filter((record) => record.result === "NG").length;
+    const latestRecord = [...items].sort((first, second) => {
+      const firstTime = `${first.check_date.slice(0, 10)} ${first.check_time}`;
+      const secondTime = `${second.check_date.slice(0, 10)} ${second.check_time}`;
+      const timeComparison = secondTime.localeCompare(firstTime);
+      return timeComparison || second.id - first.id;
+    })[0];
+
     return {
-      model: items[0]?.engine_model || "Unknown Model",
-      result: ngCount >= REWORK_TRIGGER_NG_COUNT ? "NG" : "OK",
+      model: latestRecord?.engine_model || "Unknown Model",
+      result: latestRecord?.result === "NG" ? "NG" : "OK",
     };
   });
 }

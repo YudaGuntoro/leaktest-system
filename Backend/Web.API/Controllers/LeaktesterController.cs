@@ -116,7 +116,7 @@ public class LeaktesterController : ApiControllerBase
                     .GroupBy(WorkRecordEngineKey, StringComparer.OrdinalIgnoreCase)
                     .ToList();
                 var ngEngineCount = monthEngineGroups
-                    .Count(group => group.Count(x => x.Result == "NG") >= ReworkTriggerNgCount);
+                    .Count(group => LatestWorkRecord(group)?.Result == "NG");
 
                 return new LeakTestMonthlySummary
                 {
@@ -1698,6 +1698,15 @@ DEALLOCATE PREPARE stmt;");
             ? record.EngineModelId.ToString(CultureInfo.InvariantCulture)
             : NormalizeModelKey(record.EngineModelName);
         return $"{engineModelKey}|{record.EngineNumber.Trim()}";
+    }
+
+    private static LeakTestWorkRecord? LatestWorkRecord(IEnumerable<LeakTestWorkRecord> records)
+    {
+        return records
+            .OrderByDescending(x => x.CheckDate)
+            .ThenByDescending(x => x.CheckTime)
+            .ThenByDescending(x => x.Id)
+            .FirstOrDefault();
     }
 
     private async Task PromoteToReworkEngineIfNeededAsync(LeakTestWorkRecord record)
