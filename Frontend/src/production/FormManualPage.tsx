@@ -242,13 +242,6 @@ export default function FormManualPage({ publicAccess = false }: FormManualPageP
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           {!publicAccess ? (
-            <>
-              <ExportButton disabled={exporting} onClick={() => void handleExport()}>
-                {exporting ? "Exporting..." : "Export XLSX"}
-              </ExportButton>
-            </>
-          ) : null}
-          {!publicAccess ? (
             <button
               className="h-11 rounded-lg bg-brand-500 px-5 text-sm font-bold text-white transition hover:bg-brand-600"
               onClick={() => setIsFormModalOpen(true)}
@@ -526,6 +519,9 @@ export default function FormManualPage({ publicAccess = false }: FormManualPageP
                   <option value="NG">NG</option>
                 </select>
               </label>
+              <ExportButton disabled={exporting} onClick={() => void handleExport()}>
+                {exporting ? "Exporting..." : "Export XLSX"}
+              </ExportButton>
             </div>
           }
           columns={columns}

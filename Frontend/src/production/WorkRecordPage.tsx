@@ -435,38 +435,10 @@ export default function WorkRecordPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div>
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-600">Leaktester</p>
           <h1 className="mt-2 text-2xl font-black text-slate-900 dark:text-white">Leaktester Work Record</h1>
-        </div>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-end">
-          <div className="w-full sm:w-auto">
-            <div className="flex items-end gap-1.5">
-              <div className="min-w-0 flex-1 sm:w-[240px]">
-                <DatePicker
-                  className={datePickerInputClass}
-                  dateFormat="d / m / Y"
-                  defaultDate={rangeDefaultDate}
-                  id="work-record-filter-date-range"
-                  key={`work-record-filter-date-range-${dateRangeStart || "all"}-${dateRangeEnd || "all"}`}
-                  label="Filter Date"
-                  mode="range"
-                  onChange={handleDateRangeChange}
-                  placeholder="Select start and end date"
-                  staticCalendar
-                />
-              </div>
-              <ClearFilterButton disabled={!hasDateFilter} label="Clear date filter" onClick={clearDateFilter} />
-            </div>
-          </div>
-          <ExportButton
-            className="w-full sm:w-auto"
-            disabled={exportingList}
-            onClick={() => void handleExportWorkRecordList()}
-          >
-            {exportingList ? "Exporting..." : "Export XLSX"}
-          </ExportButton>
         </div>
       </div>
 
@@ -501,7 +473,7 @@ export default function WorkRecordPage() {
             </span>
           </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,240px)_minmax(0,300px)_minmax(0,140px)_auto] sm:items-end">
+          <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,240px)_minmax(0,300px)_minmax(0,140px)_auto_minmax(0,250px)_auto] lg:items-end">
             <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
               Engine Model
               <select
@@ -546,6 +518,32 @@ export default function WorkRecordPage() {
               </select>
             </label>
             <ClearFilterButton disabled={!hasRecordFilters} label="Clear work record filters" onClick={clearRecordFilters} />
+            <div className="min-w-0">
+              <div className="flex items-end gap-1.5">
+                <div className="min-w-0 flex-1">
+                  <DatePicker
+                    className={datePickerInputClass}
+                    dateFormat="d / m / Y"
+                    defaultDate={rangeDefaultDate}
+                    id="work-record-filter-date-range"
+                    key={`work-record-filter-date-range-${dateRangeStart || "all"}-${dateRangeEnd || "all"}`}
+                    label="Filter Date"
+                    mode="range"
+                    onChange={handleDateRangeChange}
+                    placeholder="Select start and end date"
+                    staticCalendar
+                  />
+                </div>
+                <ClearFilterButton disabled={!hasDateFilter} label="Clear date filter" onClick={clearDateFilter} />
+              </div>
+            </div>
+            <ExportButton
+              className="w-full lg:w-auto"
+              disabled={exportingList}
+              onClick={() => void handleExportWorkRecordList()}
+            >
+              {exportingList ? "Exporting..." : "Export XLSX"}
+            </ExportButton>
           </div>
         </div>
 
