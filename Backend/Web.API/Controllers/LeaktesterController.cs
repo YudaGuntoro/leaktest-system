@@ -111,29 +111,21 @@ public class LeaktesterController : ApiControllerBase
                 var monthRecords = records
                     .Where(x => x.CheckDate.Month == month)
                     .ToList();
+                var monthEngineGroups = monthRecords
+                    .Where(x => !string.IsNullOrWhiteSpace(x.EngineNumber))
+                    .GroupBy(WorkRecordEngineKey, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                var ngEngineCount = monthEngineGroups
+                    .Count(group => group.Count(x => x.Result == "NG") >= ReworkTriggerNgCount);
 
                 return new LeakTestMonthlySummary
                 {
                     Year = selectedYear,
                     Month = month,
                     MonthLabel = CultureInfo.InvariantCulture.DateTimeFormat.GetAbbreviatedMonthName(month),
-                    TotalEngineInspect = monthRecords
-                        .Select(x => x.EngineNumber.Trim())
-                        .Where(x => !string.IsNullOrWhiteSpace(x))
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .Count(),
-                    Ok = monthRecords
-                        .Where(x => x.Result == "OK")
-                        .Select(x => x.EngineNumber.Trim())
-                        .Where(x => !string.IsNullOrWhiteSpace(x))
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .Count(),
-                    Ng = monthRecords
-                        .Where(x => x.Result == "NG")
-                        .Select(x => x.EngineNumber.Trim())
-                        .Where(x => !string.IsNullOrWhiteSpace(x))
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .Count()
+                    TotalEngineInspect = monthEngineGroups.Count,
+                    Ok = monthEngineGroups.Count - ngEngineCount,
+                    Ng = ngEngineCount
                 };
             })
             .ToList();
@@ -1698,6 +1690,14 @@ DEALLOCATE PREPARE stmt;");
         }
 
         return "OK";
+    }
+
+    private static string WorkRecordEngineKey(LeakTestWorkRecord record)
+    {
+        var engineModelKey = record.EngineModelId > 0
+            ? record.EngineModelId.ToString(CultureInfo.InvariantCulture)
+            : NormalizeModelKey(record.EngineModelName);
+        return $"{engineModelKey}|{record.EngineNumber.Trim()}";
     }
 
     private async Task PromoteToReworkEngineIfNeededAsync(LeakTestWorkRecord record)

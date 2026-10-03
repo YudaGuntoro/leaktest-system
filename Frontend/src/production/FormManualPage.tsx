@@ -121,6 +121,23 @@ export default function FormManualPage({ publicAccess = false }: FormManualPageP
     return records.slice(start, start + pageSize);
   }, [currentPage, pageSize, records]);
   const hasFilters = Boolean(filterDate || barcodeScanFilter.trim() || resultFilter);
+  const operatorNameByCode = useMemo(() => {
+    const map = new Map<string, string>();
+    operators.forEach((operator) => {
+      map.set(operator.operator_code.toLowerCase(), operator.operator_name);
+      map.set(operator.operator_name.toLowerCase(), operator.operator_name);
+    });
+    return map;
+  }, [operators]);
+
+  function displayOperatorName(value?: string | null) {
+    const operatorText = value?.trim();
+    if (!operatorText) {
+      return "-";
+    }
+
+    return operatorNameByCode.get(operatorText.toLowerCase()) ?? operatorText;
+  }
 
   const columns: DataTableColumn<ReworkEngineRecord>[] = [
     {
@@ -129,7 +146,7 @@ export default function FormManualPage({ publicAccess = false }: FormManualPageP
       render: (value) => <span className="font-bold text-slate-900 dark:text-white">{String(value || "-")}</span>,
     },
     { key: "engine_number", header: "Engine Number" },
-    { key: "operator_name", header: "Operator", render: (value) => String(value || "-") },
+    { key: "operator_name", header: "Operator", render: (value) => displayOperatorName(String(value || "")) },
     { key: "rework_date", header: "Date", render: (value) => displayDate(String(value)) },
     { key: "rework_time", header: "Time", render: (value) => displayTime(String(value)) },
     { key: "parameter_channel_no", header: "Channel", render: (_value, row) => displayOptional(row.parameter_channel_no) },
@@ -438,7 +455,7 @@ export default function FormManualPage({ publicAccess = false }: FormManualPageP
               </div>
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
                 <p className={labelClass}>Operator</p>
-                <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{selectedRecord.operator_name || "-"}</p>
+                <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{displayOperatorName(selectedRecord.operator_name)}</p>
               </div>
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
                 <p className={labelClass}>Date / Time</p>

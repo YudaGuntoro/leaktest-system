@@ -18,6 +18,7 @@ const ReactApexChart = dynamic(() => import("react-apexcharts"), {
 });
 const DEFAULT_TABLE_PAGE_SIZE = 10;
 const TABLE_PAGE_SIZE_OPTIONS = [10, 25, 50, 0];
+const REWORK_TRIGGER_NG_COUNT = 3;
 const datePickerInputClass = "h-10 rounded-lg border-gray-200 bg-white px-4 pr-10 text-sm font-black text-slate-900 shadow-theme-xs focus:border-brand-400 focus:ring-brand-400/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white";
 
 function MetricCard({
@@ -87,6 +88,37 @@ function getVisiblePages(currentPage: number, totalPages: number) {
   const pageCount = Math.min(5, totalPages);
   const start = Math.min(Math.max(currentPage - 2, 1), Math.max(totalPages - pageCount + 1, 1));
   return Array.from({ length: pageCount }, (_, index) => start + index);
+}
+
+type EngineInspectionOutcome = {
+  model: string;
+  result: "OK" | "NG";
+};
+
+function engineInspectionKey(record: LeakTestWorkRecord) {
+  const modelKey = record.engine_model_id > 0 ? String(record.engine_model_id) : record.engine_model.trim().toLowerCase();
+  return `${modelKey}|${record.engine_number.trim().toLowerCase()}`;
+}
+
+function summarizeEngineInspectionOutcomes(records: LeakTestWorkRecord[]): EngineInspectionOutcome[] {
+  const groups = new Map<string, LeakTestWorkRecord[]>();
+
+  records.forEach((record) => {
+    if (!record.engine_number.trim()) {
+      return;
+    }
+
+    const key = engineInspectionKey(record);
+    groups.set(key, [...(groups.get(key) ?? []), record]);
+  });
+
+  return Array.from(groups.values()).map((items) => {
+    const ngCount = items.filter((record) => record.result === "NG").length;
+    return {
+      model: items[0]?.engine_model || "Unknown Model",
+      result: ngCount >= REWORK_TRIGGER_NG_COUNT ? "NG" : "OK",
+    };
+  });
 }
 
 export default function ProductionDashboard() {
@@ -196,9 +228,10 @@ export default function ProductionDashboard() {
   }, []);
 
   const judgement = useMemo(() => {
-    const ok = records.filter((item) => item.result === "OK").length;
-    const ng = records.filter((item) => item.result === "NG").length;
-    const total = records.length;
+    const outcomes = summarizeEngineInspectionOutcomes(records);
+    const ok = outcomes.filter((item) => item.result === "OK").length;
+    const ng = outcomes.filter((item) => item.result === "NG").length;
+    const total = outcomes.length;
     const okRate = total ? (ok / total) * 100 : 0;
     const ngRate = total ? (ng / total) * 100 : 0;
     return { ng, ngRate, ok, okRate, total };
@@ -206,8 +239,14 @@ export default function ProductionDashboard() {
   const chartData = useMemo(() => {
     return {
       categories: selectedDateParams.map(displayShortDate),
-      ngSeries: selectedDateParams.map((dateItem) => records.filter((record) => record.check_date.slice(0, 10) === dateItem && record.result === "NG").length),
-      okSeries: selectedDateParams.map((dateItem) => records.filter((record) => record.check_date.slice(0, 10) === dateItem && record.result === "OK").length),
+      ngSeries: selectedDateParams.map((dateItem) => {
+        const outcomes = summarizeEngineInspectionOutcomes(records.filter((record) => record.check_date.slice(0, 10) === dateItem));
+        return outcomes.filter((record) => record.result === "NG").length;
+      }),
+      okSeries: selectedDateParams.map((dateItem) => {
+        const outcomes = summarizeEngineInspectionOutcomes(records.filter((record) => record.check_date.slice(0, 10) === dateItem));
+        return outcomes.filter((record) => record.result === "OK").length;
+      }),
     };
   }, [records, selectedDateParams]);
   const chartMaxValue = useMemo(
@@ -450,9 +489,9 @@ export default function ProductionDashboard() {
     },
   ], [monthlySummary]);
   const topNgData = useMemo(() => {
-    const grouped = records.reduce<Record<string, number>>((current, record) => {
+    const grouped = summarizeEngineInspectionOutcomes(records).reduce<Record<string, number>>((current, record) => {
       if (record.result !== "NG") return current;
-      const key = record.engine_model || "Unknown Model";
+      const key = record.model || "Unknown Model";
       current[key] = (current[key] ?? 0) + 1;
       return current;
     }, {});
