@@ -45,7 +45,7 @@ public class LeaktesterController : ApiControllerBase
             .ToListAsync();
 
         await HydrateWorkRecordParameterContextAsync(records);
-        return ApiOk(FilterWorkRecordsByResult(records, result).Take(500).ToList());
+        return ApiOk(FilterWorkRecordsByResult(FilterWorkRecordsForDisplay(records), result).Take(500).ToList());
     }
 
     [HttpGet("work-records/export")]
@@ -70,7 +70,7 @@ public class LeaktesterController : ApiControllerBase
                 .ThenByDescending(x => x.Id)
                 .ToListAsync();
             await HydrateWorkRecordParameterContextAsync(records);
-            records = FilterWorkRecordsByResult(records, result).ToList();
+            records = FilterWorkRecordsByResult(FilterWorkRecordsForDisplay(records), result).ToList();
 
             var effectiveDateFrom = dateFrom ?? date;
             var effectiveDateTo = dateTo ?? date;
@@ -1656,6 +1656,19 @@ DEALLOCATE PREPARE stmt;");
         return resultTerm is "OK" or "NG"
             ? records.Where(x => string.Equals(x.Result, resultTerm, StringComparison.OrdinalIgnoreCase))
             : records;
+    }
+
+    private static IEnumerable<LeakTestWorkRecord> FilterWorkRecordsForDisplay(IEnumerable<LeakTestWorkRecord> records)
+    {
+        var materializedRecords = records as IReadOnlyList<LeakTestWorkRecord> ?? records.ToList();
+        var ngCountsByEngine = materializedRecords
+            .Where(x => string.Equals(x.Result, "NG", StringComparison.OrdinalIgnoreCase))
+            .GroupBy(WorkRecordEngineKey, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(x => x.Key, x => x.Count(), StringComparer.OrdinalIgnoreCase);
+
+        return materializedRecords.Where(record =>
+            !string.Equals(record.Result, "NG", StringComparison.OrdinalIgnoreCase) ||
+            (ngCountsByEngine.TryGetValue(WorkRecordEngineKey(record), out var ngCount) && ngCount >= ReworkTriggerNgCount));
     }
 
     private static string EvaluateWorkRecordResult(LeakTestWorkRecord record)
