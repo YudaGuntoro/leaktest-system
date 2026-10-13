@@ -111,7 +111,8 @@ public class LeaktesterController : ApiControllerBase
                 var monthRecords = records
                     .Where(x => x.CheckDate.Month == month)
                     .ToList();
-                var monthEngineGroups = monthRecords
+                var visibleMonthRecords = FilterWorkRecordsForDisplay(monthRecords).ToList();
+                var monthEngineGroups = visibleMonthRecords
                     .Where(x => !string.IsNullOrWhiteSpace(x.EngineNumber))
                     .GroupBy(WorkRecordEngineKey, StringComparer.OrdinalIgnoreCase)
                     .ToList();
