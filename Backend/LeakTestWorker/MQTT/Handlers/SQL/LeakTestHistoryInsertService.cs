@@ -87,9 +87,9 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
             await connection.ExecuteAsync(new CommandDefinition(
                 """
                 INSERT INTO leak_test_work_records
-                    (engine_model_id, engine_number, barcode_scan, check_date, check_time, machine_name, operator_name, parameter_pressure, channel_no, press_set_up, press_set_low, pressure_input, cycle_time_leak_test_minutes, judgement_code, created_at, updated_at)
+                    (engine_model_id, engine_number, barcode_scan, check_date, check_time, machine_name, operator_name, parameter_pressure, channel_no, press_set_up, press_set_low, pressure_input, cycle_time_leak_test_minutes, judgement_code, source_payload, created_at, updated_at)
                 VALUES
-                    (@engine_model_id, @engine_number, @barcode_scan, @check_date, @check_time, @machine_name, @operator_name, @parameter_pressure, @channel_no, @press_set_up, @press_set_low, @pressure_input, @cycle_time, @judgement_code, NOW(), NOW());
+                    (@engine_model_id, @engine_number, @barcode_scan, @check_date, @check_time, @machine_name, @operator_name, @parameter_pressure, @channel_no, @press_set_up, @press_set_low, @pressure_input, @cycle_time, @judgement_code, @source_payload, NOW(), NOW());
                 """,
                 new
                 {
@@ -106,7 +106,8 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
                     press_set_low = record.PressSetLow,
                     pressure_input = record.PressureInput,
                     cycle_time = record.CycleTimeLeakTestMinutes,
-                    judgement_code = record.JudgementCode
+                    judgement_code = record.JudgementCode,
+                    source_payload = record.RawPayload
                 },
                 transaction,
                 cancellationToken: cancellationToken));
@@ -309,6 +310,7 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
         await EnsureColumnAsync(connection, "press_set_low", "ALTER TABLE leak_test_work_records ADD COLUMN press_set_low DECIMAL(8, 2) NULL AFTER press_set_up", cancellationToken);
         await EnsureColumnAsync(connection, "operator_name", "ALTER TABLE leak_test_work_records ADD COLUMN operator_name VARCHAR(150) NULL AFTER machine_name", cancellationToken);
         await EnsureColumnAsync(connection, "judgement_code", "ALTER TABLE leak_test_work_records ADD COLUMN judgement_code INT NULL AFTER cycle_time_leak_test_minutes", cancellationToken);
+        await EnsureColumnAsync(connection, "source_payload", "ALTER TABLE leak_test_work_records ADD COLUMN source_payload LONGTEXT NULL AFTER judgement_code", cancellationToken);
         await DropJudgementNameColumnAsync(connection, cancellationToken);
         await DropResultColumnAsync(connection, cancellationToken);
         await EnsureIndexAsync(connection, "ix_leak_test_work_records_barcode_scan", "CREATE INDEX ix_leak_test_work_records_barcode_scan ON leak_test_work_records (barcode_scan)", cancellationToken);

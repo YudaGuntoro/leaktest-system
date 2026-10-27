@@ -10,6 +10,8 @@ public sealed class LeakTestHistoryRecord
 
     public string? BarcodeScan { get; init; }
 
+    public string? RawPayload { get; init; }
+
     public DateTime CheckDate { get; init; }
 
     public string CheckTime { get; init; } = string.Empty;

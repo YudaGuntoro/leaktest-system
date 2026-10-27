@@ -83,3 +83,4 @@ SOURCE Backend/Web.API.Persistence/Migrations/20260810_010_drop_work_record_judg
 SOURCE Backend/Web.API.Persistence/Migrations/20260810_011_drop_work_record_result.sql;
 SOURCE Backend/Web.API.Persistence/Migrations/20260813_001_judgement_master_20_codes.sql;
 SOURCE Backend/Web.API.Persistence/Migrations/20261027_001_leak_test_rejected_mqtt_messages.sql;
+SOURCE Backend/Web.API.Persistence/Migrations/20261027_002_work_record_source_payload.sql;

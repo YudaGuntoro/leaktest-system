@@ -9,6 +9,7 @@ CREATE DATABASE IF NOT EXISTS yanmarleaktest
 USE yanmarleaktest;
 
 SOURCE Backend/Web.API.Persistence/Migrations/20261027_001_leak_test_rejected_mqtt_messages.sql;
+SOURCE Backend/Web.API.Persistence/Migrations/20261027_002_work_record_source_payload.sql;
 
 CREATE TABLE IF NOT EXISTS roles (
     id INT AUTO_INCREMENT PRIMARY KEY,

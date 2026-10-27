@@ -81,6 +81,7 @@ public static class LeakTestPayloadMapper
             EngineModel = engineModel,
             EngineNumber = engineNumber ?? string.Empty,
             BarcodeScan = normalizedBarcode,
+            RawPayload = message.RawJson,
             CheckDate = checkDate.Date,
             CheckTime = checkTime,
             MachineName = ReadString(message.Data, "machine_name", "machineName", "MachineName", "machine", "Machine", "line", "Line", "LineNo")
