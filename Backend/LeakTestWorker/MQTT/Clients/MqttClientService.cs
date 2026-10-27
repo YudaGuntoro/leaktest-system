@@ -260,7 +260,11 @@ public sealed class MqttClientService : BackgroundService, IMqttClientService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[MQTT] Failed to save message to history. Topic={Topic}", topic);
+            _logger.LogError(
+                ex,
+                "[MQTT] Failed to save message to history. Topic={Topic} Payload={Payload}",
+                topic,
+                payloadText);
         }
     }
 

@@ -7,4 +7,10 @@ public interface ILeakTestHistoryInsertService
     Task WaitUntilReadyAsync(CancellationToken cancellationToken = default);
 
     Task<long> InsertAsync(LeakTestHistoryRecord record, CancellationToken cancellationToken = default);
+
+    Task<long> SaveRejectedMessageAsync(
+        string topic,
+        string payload,
+        string error,
+        CancellationToken cancellationToken = default);
 }

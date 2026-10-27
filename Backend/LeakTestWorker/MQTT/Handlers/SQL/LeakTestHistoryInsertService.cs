@@ -21,7 +21,53 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
     {
         await using var connection = new MySqlConnection(dbConfig.MysqlConnString);
         await DbRetry.OpenWithRetryAsync(connection, _logger, "DB_WARMUP", cancellationToken, maxRetry: 60);
+        await EnsureRejectedMessagesTableAsync(connection, cancellationToken);
         _logger.LogInformation("[DB] READY");
+    }
+
+    public async Task<long> SaveRejectedMessageAsync(
+        string topic,
+        string payload,
+        string error,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = new MySqlConnection(dbConfig.MysqlConnString);
+        await DbRetry.OpenWithRetryAsync(connection, _logger, "SAVE_REJECTED_MQTT", cancellationToken);
+        await EnsureRejectedMessagesTableAsync(connection, cancellationToken);
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            """
+            INSERT INTO leak_test_rejected_mqtt_messages (topic, payload, error_message, status, received_at)
+            VALUES (@topic, @payload, @error, 'Pending', NOW());
+            """,
+            new { topic, payload, error },
+            cancellationToken: cancellationToken));
+
+        return await connection.ExecuteScalarAsync<long>(new CommandDefinition(
+            "SELECT LAST_INSERT_ID();",
+            cancellationToken: cancellationToken));
+    }
+
+    private static async Task EnsureRejectedMessagesTableAsync(
+        MySqlConnection connection,
+        CancellationToken cancellationToken)
+    {
+        await connection.ExecuteAsync(new CommandDefinition(
+            """
+            CREATE TABLE IF NOT EXISTS leak_test_rejected_mqtt_messages (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                topic VARCHAR(255) NOT NULL,
+                payload LONGTEXT NOT NULL,
+                error_message TEXT NOT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'Pending',
+                attempt_count INT NOT NULL DEFAULT 0,
+                received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                last_attempt_at DATETIME NULL,
+                processed_at DATETIME NULL,
+                KEY ix_rejected_mqtt_status_received (status, received_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            """,
+            cancellationToken: cancellationToken));
     }
 
     public async Task<long> InsertAsync(LeakTestHistoryRecord record, CancellationToken cancellationToken = default)

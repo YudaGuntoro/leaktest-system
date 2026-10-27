@@ -40,6 +40,19 @@ public sealed class LeakTestMessageRouter : ILeakTestMessageHandler
             await handler.InsertAsync(topic, payload, cancellationToken);
             await ReprocessBufferAsync(cancellationToken);
         }
+        catch (Exception ex) when (ex is FormatException or JsonException)
+        {
+            var rejectedId = await _historyInsertService.SaveRejectedMessageAsync(
+                topic,
+                payload,
+                ex.Message,
+                cancellationToken);
+            _logger.LogError(
+                ex,
+                "[MQTT] Invalid payload saved for review. RejectedMessageId={RejectedMessageId} Topic={Topic}",
+                rejectedId,
+                topic);
+        }
         catch (Exception ex) when (DbRetry.IsDatabaseException(ex) && !cancellationToken.IsCancellationRequested)
         {
             await BufferAsync(topic, payload, ex, cancellationToken);
