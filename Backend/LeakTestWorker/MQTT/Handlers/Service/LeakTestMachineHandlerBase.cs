@@ -36,12 +36,13 @@ public abstract class LeakTestMachineHandlerBase : ILeakTestMachineHandler
         var insertedId = await _historyInsertService.InsertAsync(record, cancellationToken);
 
         _logger.LogInformation(
-            "[{Machine}] Inserted history Id={Id} EngineNo={EngineNumber} PressureInput={PressureInput} Topic={Topic}",
+            "[{Machine}] Inserted history Id={Id} EngineNo={EngineNumber} PressureInput={PressureInput} Topic={Topic} Payload={Payload}",
             MachineName,
             insertedId,
             record.EngineNumber,
             record.PressureInput,
-            topic);
+            topic,
+            payload);
 
         return insertedId;
     }
