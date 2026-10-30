@@ -7,6 +7,7 @@ using ClosedXML.Excel;
 using System.Globalization;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Web.API.Domain.Production;
@@ -709,7 +710,8 @@ public class LeaktesterController : ApiControllerBase
                     item.LastAttemptAt = DateTime.Now;
                     await _db.SaveChangesAsync(HttpContext.RequestAborted);
 
-                    var payloadNode = JsonNode.Parse(draft.Payload)?.AsObject()
+                    var normalizedPayload = EscapeRawJsonStringControls(draft.Payload);
+                    var payloadNode = JsonNode.Parse(normalizedPayload)?.AsObject()
                         ?? throw new ArgumentException($"Payload for message {draft.Id} must be a JSON object.");
                     payloadNode["_rejected_mqtt_message_id"] = item.Id;
                     var record = LeakTestPayloadMapper.ToHistoryRecord(item.Topic, payloadNode.ToJsonString());
@@ -749,6 +751,50 @@ public class LeaktesterController : ApiControllerBase
         {
             return ApiBadRequest(ex);
         }
+    }
+
+    private static string EscapeRawJsonStringControls(string json)
+    {
+        var result = new StringBuilder(json.Length);
+        var insideString = false;
+        var escaped = false;
+
+        foreach (var character in json)
+        {
+            if (insideString && !escaped && character < ' ')
+            {
+                result.Append(character switch
+                {
+                    '\r' => "\\r",
+                    '\n' => "\\n",
+                    '\t' => "\\t",
+                    _ => $"\\u{(int)character:x4}"
+                });
+                continue;
+            }
+
+            result.Append(character);
+            if (!insideString)
+            {
+                if (character == '"') insideString = true;
+                continue;
+            }
+
+            if (escaped)
+            {
+                escaped = false;
+            }
+            else if (character == '\\')
+            {
+                escaped = true;
+            }
+            else if (character == '"')
+            {
+                insideString = false;
+            }
+        }
+
+        return result.ToString();
     }
 
     [HttpGet("parameters")]
