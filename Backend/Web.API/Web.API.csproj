@@ -39,7 +39,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Web.API.Domain\Web.API.Domain.csproj" />
     <ProjectReference Include="..\Web.API.Persistence\Web.API.Persistence.csproj" />
-    <ProjectReference Include="..\LeakTestWorker\LeakTestWorker.csproj" />
+    <ProjectReference Include="..\LeakTestWorker\LeakTestWorker.csproj" AdditionalProperties="SkipWorkerConfigCopy=true" />
   </ItemGroup>
 
   <ItemGroup>

@@ -36,4 +36,12 @@
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </None>
   </ItemGroup>
+
+  <!-- The API references this executable for shared mapping/DB services. Keep its
+       configuration out of the API publish output; standalone Worker publish keeps it. -->
+  <ItemGroup Condition="'$(SkipWorkerConfigCopy)' == 'true'">
+    <None Update="Settings.ini" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
+    <Content Update="appsettings*.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
+    <None Update="appsettings*.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
+  </ItemGroup>
 </Project>
