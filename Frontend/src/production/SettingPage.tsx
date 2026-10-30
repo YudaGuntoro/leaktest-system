@@ -114,6 +114,7 @@ export default function SettingPage() {
     setMessage(null);
     try {
       const result = await apiRequest<{ published_ids: number[]; failed_ids: number[] }>("/api/leaktester/rejected-mqtt-messages/reprocess-all", {
+        method: "POST",
         body: JSON.stringify({ items: rejectedMessages.map((row) => ({ id: row.id, payload: buildEditedPayload(row) })) }),
       });
       setMessage({
@@ -467,6 +468,13 @@ export default function SettingPage() {
             </button>
           </div>
         </div>
+        {message ? (
+          <div className={message.kind === "ok"
+            ? "border-b border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-medium text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300"
+            : "border-b border-red-200 bg-red-50 px-5 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"}>
+            {message.text}
+          </div>
+        ) : null}
         <div className="overflow-auto p-5">
           <table className="leak-rounded-header-table w-full min-w-[1050px] border-separate border-spacing-0 text-left text-sm">
             <thead className="bg-transparent text-xs uppercase text-white">
