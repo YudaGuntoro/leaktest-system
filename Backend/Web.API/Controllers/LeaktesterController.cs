@@ -707,7 +707,7 @@ public class LeaktesterController : ApiControllerBase
                     var payloadNode = JsonNode.Parse(normalizedPayload)?.AsObject()
                         ?? throw new ArgumentException($"Payload for message {draft.Id} must be a JSON object.");
                     payloadNode["_rejected_mqtt_message_id"] = item.Id;
-                    var record = LeakTestPayloadMapper.ToHistoryRecord(item.Topic, payloadNode.ToJsonString());
+                    var record = LeakTestPayloadMapper.ToHistoryRecord(item.Topic, payloadNode.ToJsonString(), item.ReceivedAt);
                     await historyInsertService.InsertAsync(record, HttpContext.RequestAborted);
                     processedIds.Add(item.Id);
                 }

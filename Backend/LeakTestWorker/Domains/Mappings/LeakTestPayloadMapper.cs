@@ -42,7 +42,7 @@ public static class LeakTestPayloadMapper
         "ts"
     ];
 
-    public static LeakTestHistoryRecord ToHistoryRecord(string topic, string payload)
+    public static LeakTestHistoryRecord ToHistoryRecord(string topic, string payload, DateTime? receivedAt = null)
     {
         if (string.IsNullOrWhiteSpace(payload))
         {
@@ -57,9 +57,9 @@ public static class LeakTestPayloadMapper
             Data = SelectDataObject(root)
         };
 
-        var serverNow = DateTime.Now;
-        var checkDate = serverNow.Date;
-        var checkTime = serverNow.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+        var checkTimestamp = receivedAt ?? DateTime.Now;
+        var checkDate = checkTimestamp.Date;
+        var checkTime = checkTimestamp.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
 
         var pressSetUp = ReadDecimal(message.Data, "press_set_up", "pressSetUp", "PressSetUp", "upper_press_limit", "UpperPressLimit", "tp_ul", "TP_UL", "par_press_up");
         var pressSetLow = ReadDecimal(message.Data, "press_set_low", "pressSetLow", "PressSetLow", "lower_press_limit", "LowerPressLimit", "tp_ll", "TP_LL", "par_press_low");
