@@ -300,16 +300,6 @@ public static class LeakTestPayloadMapper
             missingFields.Add("engine_number");
         }
 
-        if (record.ParameterPressure <= 0)
-        {
-            missingFields.Add("parameter_pressure");
-        }
-
-        if (record.PressureInput <= 0)
-        {
-            missingFields.Add("pressure_input");
-        }
-
         if (record.CycleTimeLeakTestMinutes <= 0)
         {
             missingFields.Add("cycle_time_leak_test_minutes");
