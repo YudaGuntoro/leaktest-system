@@ -2,7 +2,7 @@ using Dapper;
 using LeakTestWorker.Domains.Models;
 using LeakTestWorker.Helper;
 using LeakTestWorker.Singletone;
-using MySql.Data.MySqlClient;
+using MySqlConnector;
 using System.Security.Cryptography;
 using System.Text;
 

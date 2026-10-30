@@ -1,7 +1,7 @@
 using System.Data.Common;
 using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
-using MySql.Data.MySqlClient;
+using MySqlConnector;
 
 namespace LeakTestWorker.Helper;
 
@@ -26,7 +26,12 @@ public static class DbRetry
                 await connection.OpenAsync(cancellationToken);
                 return;
             }
-            catch (MySqlException ex) when (attempt < maxRetry)
+            catch (MySql.Data.MySqlClient.MySqlException ex) when (attempt < maxRetry)
+            {
+                logger.LogWarning(ex, "[DB] {Operation} retry {Attempt}/{MaxRetry}", operationName, attempt, maxRetry);
+                await Task.Delay(GetRetryDelay(attempt), cancellationToken);
+            }
+            catch (MySqlConnector.MySqlException ex) when (attempt < maxRetry)
             {
                 logger.LogWarning(ex, "[DB] {Operation} retry {Attempt}/{MaxRetry}", operationName, attempt, maxRetry);
                 await Task.Delay(GetRetryDelay(attempt), cancellationToken);
@@ -45,6 +50,6 @@ public static class DbRetry
         TimeSpan.FromSeconds(Math.Min(attempt, 10));
 
     public static bool IsDatabaseException(Exception exception) =>
-        exception is MySqlException or TimeoutException or SocketException or IOException
+        exception is MySql.Data.MySqlClient.MySqlException or MySqlConnector.MySqlException or TimeoutException or SocketException or IOException
         || exception.InnerException is not null && IsDatabaseException(exception.InnerException);
 }
