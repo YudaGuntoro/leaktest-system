@@ -12,7 +12,59 @@ const labelClass = "text-xs font-bold uppercase text-slate-600 dark:text-slate-3
 const backupActionClass = "inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800";
 const tableInputClass = "h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-400 focus:ring-3 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500";
 type PageMessage = { kind: "ok" | "error"; text: string };
+type RejectedMqttMessage = {
+  id: number;
+  topic: string;
+  payload: string;
+  error_message: string;
+  status: string;
+  attempt_count: number;
+  received_at: string;
+  last_attempt_at: string | null;
+  pressureInput: string;
+  pressSetUp: string;
+  pressSetLow: string;
+};
 const showJudgementMaster = true;
+
+function editPressureValues(row: RejectedMqttMessage) {
+  try {
+    const root = JSON.parse(row.payload) as Record<string, unknown>;
+    const inputAliases = ["pressure_input", "pressureInput", "PressureInput", "press_input", "press_in_result"];
+    const data = inputAliases.some((key) => key in root)
+      ? root
+      : Object.values(root).find((value) => value && typeof value === "object" && !Array.isArray(value) && inputAliases.some((key) => key in (value as Record<string, unknown>))) as Record<string, unknown> | undefined ?? root;
+    const readValue = (names: string[]) => {
+      const found = names.find((key) => key in data);
+      return found ? String(data[found] ?? "") : "";
+    };
+    return {
+      ...row,
+      pressureInput: readValue(inputAliases),
+      pressSetUp: readValue(["press_set_up", "pressSetUp", "PressSetUp", "upper_press_limit", "UpperPressLimit", "tp_ul", "TP_UL", "par_press_up"]),
+      pressSetLow: readValue(["press_set_low", "pressSetLow", "PressSetLow", "lower_press_limit", "LowerPressLimit", "tp_ll", "TP_LL", "par_press_low"]),
+    };
+  } catch {
+    return { ...row, pressureInput: "", pressSetUp: "", pressSetLow: "" };
+  }
+}
+
+function buildEditedPayload(row: RejectedMqttMessage) {
+  try {
+    const root = JSON.parse(row.payload) as Record<string, unknown>;
+    const aliases = ["pressure_input", "pressureInput", "PressureInput", "press_input", "press_in_result"];
+    let data = aliases.some((key) => key in root)
+      ? root
+      : Object.values(root).find((value) => value && typeof value === "object" && !Array.isArray(value) && aliases.some((key) => key in (value as Record<string, unknown>))) as Record<string, unknown> | undefined;
+    if (!data) data = root;
+    data.pressure_input = row.pressureInput;
+    data.press_set_up = row.pressSetUp;
+    data.press_set_low = row.pressSetLow;
+    return JSON.stringify(root);
+  } catch {
+    return row.payload;
+  }
+}
 
 export default function SettingPage() {
   const [settings, setSettings] = useState<SystemSettings>(() => readSystemSettings());
@@ -21,6 +73,10 @@ export default function SettingPage() {
   const [saving, setSaving] = useState(false);
   const [loadingJudgements, setLoadingJudgements] = useState(false);
   const [savingJudgementId, setSavingJudgementId] = useState<number | null>(null);
+  const [rejectedMessages, setRejectedMessages] = useState<RejectedMqttMessage[]>([]);
+  const [loadingRejected, setLoadingRejected] = useState(false);
+  const [showRejectedList, setShowRejectedList] = useState(false);
+  const [reprocessingAll, setReprocessingAll] = useState(false);
   const [message, setMessage] = useState<PageMessage | null>(null);
 
   useEffect(() => {
@@ -35,6 +91,42 @@ export default function SettingPage() {
       ignore = true;
     };
   }, []);
+
+  async function loadRejectedMessages() {
+    setLoadingRejected(true);
+    try {
+      const rows = await apiGet<Omit<RejectedMqttMessage, "pressureInput" | "pressSetUp" | "pressSetLow">[]>("/api/leaktester/rejected-mqtt-messages");
+      setRejectedMessages(rows.map((row) => editPressureValues(row as RejectedMqttMessage)));
+    } catch (err) {
+      setMessage({ kind: "error", text: err instanceof Error ? err.message : "Failed to load rejected MQTT messages." });
+    } finally {
+      setLoadingRejected(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadRejectedMessages();
+  }, []);
+
+  async function reprocessAllRejectedMessages() {
+    if (rejectedMessages.length === 0) return;
+    setReprocessingAll(true);
+    setMessage(null);
+    try {
+      const result = await apiRequest<{ published_ids: number[]; failed_ids: number[] }>("/api/leaktester/rejected-mqtt-messages/reprocess-all", {
+        body: JSON.stringify({ items: rejectedMessages.map((row) => ({ id: row.id, payload: buildEditedPayload(row) })) }),
+      });
+      setMessage({
+        kind: result.failed_ids.length === 0 ? "ok" : "error",
+        text: `${result.published_ids.length} payload dikirim; ${result.failed_ids.length} payload gagal dikirim. Payload yang gagal diproses worker akan tetap di tabel.`,
+      });
+      window.setTimeout(() => void loadRejectedMessages(), 1000);
+    } catch (err) {
+      setMessage({ kind: "error", text: err instanceof Error ? err.message : "Failed to reprocess rejected MQTT messages." });
+    } finally {
+      setReprocessingAll(false);
+    }
+  }
 
   useEffect(() => {
     if (!showJudgementMaster) {
@@ -136,6 +228,16 @@ export default function SettingPage() {
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-600">System</p>
         <h1 className="mt-2 text-2xl font-black text-slate-900 dark:text-white">Setting</h1>
+        <button
+          className="mt-4 inline-flex h-11 items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 text-sm font-bold text-brand-700 transition hover:bg-brand-100 dark:border-brand-500/20 dark:bg-brand-500/10 dark:text-brand-300 dark:hover:bg-brand-500/20"
+          onClick={() => {
+            setShowRejectedList(true);
+            void loadRejectedMessages();
+          }}
+          type="button"
+        >
+          Unprocessed Data ({rejectedMessages.length})
+        </button>
       </div>
 
       {message ? (
@@ -341,6 +443,64 @@ export default function SettingPage() {
           </table>
         </div>
       </section>
+      ) : null}
+
+      {showRejectedList ? (
+      <div
+        className="fixed inset-0 z-[100000] flex items-center justify-center bg-slate-950/60 p-3 sm:p-6"
+        role="presentation"
+        onMouseDown={(event) => { if (event.target === event.currentTarget) setShowRejectedList(false); }}
+      >
+      <section aria-labelledby="unprocessed-data-title" aria-modal="true" className="flex max-h-[92vh] w-full max-w-[96vw] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900" role="dialog">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-5 dark:border-slate-800">
+          <div>
+            <h2 id="unprocessed-data-title" className="text-base font-bold text-slate-900 dark:text-white">Unprocessed MQTT Data</h2>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Edit nilai tekanan jika diperlukan, lalu kirim semua payload ke worker.</p>
+          </div>
+          <div className="flex gap-2">
+            <button className={backupActionClass} onClick={() => setShowRejectedList(false)} type="button">Close</button>
+            <button className={backupActionClass} onClick={() => void loadRejectedMessages()} type="button" disabled={loadingRejected || reprocessingAll}>
+              {loadingRejected ? "Loading..." : "Refresh"}
+            </button>
+            <button className="h-12 rounded-lg bg-brand-500 px-5 text-sm font-bold text-white hover:bg-brand-600 disabled:opacity-60" onClick={() => void reprocessAllRejectedMessages()} type="button" disabled={rejectedMessages.length === 0 || reprocessingAll || loadingRejected}>
+              {reprocessingAll ? "Sending..." : "Reprocess All"}
+            </button>
+          </div>
+        </div>
+        <div className="overflow-auto p-5">
+          <table className="leak-rounded-header-table w-full min-w-[1050px] border-separate border-spacing-0 text-left text-sm">
+            <thead className="bg-transparent text-xs uppercase text-white">
+              <tr>
+                <th className="rounded-l-lg bg-brand-500 px-4 py-3">Received</th>
+                <th className="bg-brand-500 px-4 py-3">Topic</th>
+                <th className="bg-brand-500 px-4 py-3">Error</th>
+                <th className="bg-brand-500 px-4 py-3">Status</th>
+                <th className="bg-brand-500 px-4 py-3">Attempts</th>
+                <th className="bg-brand-500 px-4 py-3">Pressure Input</th>
+                <th className="bg-brand-500 px-4 py-3">Press Set Up</th>
+                <th className="rounded-r-lg bg-brand-500 px-4 py-3">Press Set Low</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loadingRejected && rejectedMessages.length === 0 ? <tr><td className="px-4 py-5 text-slate-500" colSpan={8}>Loading...</td></tr> : null}
+              {!loadingRejected && rejectedMessages.length === 0 ? <tr><td className="px-4 py-5 text-slate-500" colSpan={8}>No rejected MQTT messages.</td></tr> : null}
+              {rejectedMessages.map((row) => (
+                <tr key={row.id}>
+                  <td className="border-b border-slate-100 px-4 py-3 text-slate-700 dark:border-slate-800 dark:text-slate-300">{new Date(row.received_at).toLocaleString()}</td>
+                  <td className="max-w-xs border-b border-slate-100 px-4 py-3 font-semibold text-slate-800 dark:border-slate-800 dark:text-slate-200">{row.topic}</td>
+                  <td className="max-w-md border-b border-slate-100 px-4 py-3 text-rose-700 dark:border-slate-800 dark:text-rose-300">{row.error_message}</td>
+                  <td className="border-b border-slate-100 px-4 py-3 dark:border-slate-800">{row.status}</td>
+                  <td className="border-b border-slate-100 px-4 py-3 dark:border-slate-800">{row.attempt_count}</td>
+                  <td className="border-b border-slate-100 px-2 py-2 dark:border-slate-800"><input aria-label={`Pressure Input ${row.id}`} className={tableInputClass} inputMode="decimal" value={row.pressureInput} onChange={(event) => setRejectedMessages((current) => current.map((item) => item.id === row.id ? { ...item, pressureInput: event.target.value } : item))} /></td>
+                  <td className="border-b border-slate-100 px-2 py-2 dark:border-slate-800"><input aria-label={`Press Set Up ${row.id}`} className={tableInputClass} inputMode="decimal" value={row.pressSetUp} onChange={(event) => setRejectedMessages((current) => current.map((item) => item.id === row.id ? { ...item, pressSetUp: event.target.value } : item))} /></td>
+                  <td className="border-b border-slate-100 px-2 py-2 dark:border-slate-800"><input aria-label={`Press Set Low ${row.id}`} className={tableInputClass} inputMode="decimal" value={row.pressSetLow} onChange={(event) => setRejectedMessages((current) => current.map((item) => item.id === row.id ? { ...item, pressSetLow: event.target.value } : item))} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      </div>
       ) : null}
       </div>
 

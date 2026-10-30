@@ -105,6 +105,43 @@ public class LeakTestJudgement
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 }
 
+public class RejectedMqttMessage
+{
+    [JsonPropertyName("id")]
+    public long Id { get; set; }
+    [JsonPropertyName("topic")]
+    public string Topic { get; set; } = string.Empty;
+    [JsonPropertyName("payload")]
+    public string Payload { get; set; } = string.Empty;
+    [JsonPropertyName("error_message")]
+    public string ErrorMessage { get; set; } = string.Empty;
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = "Pending";
+    [JsonPropertyName("attempt_count")]
+    public int AttemptCount { get; set; }
+    [JsonPropertyName("received_at")]
+    public DateTime ReceivedAt { get; set; }
+    [JsonPropertyName("last_attempt_at")]
+    public DateTime? LastAttemptAt { get; set; }
+    [JsonPropertyName("processed_at")]
+    public DateTime? ProcessedAt { get; set; }
+}
+
+public class ReprocessRejectedMqttMessagesRequest
+{
+    [JsonPropertyName("items")]
+    public List<ReprocessRejectedMqttMessageItem> Items { get; set; } = new();
+}
+
+public class ReprocessRejectedMqttMessageItem
+{
+    [JsonPropertyName("id")]
+    public long Id { get; set; }
+
+    [JsonPropertyName("payload")]
+    public string Payload { get; set; } = string.Empty;
+}
+
 public class MeasurementUnit
 {
     [JsonPropertyName("id")]

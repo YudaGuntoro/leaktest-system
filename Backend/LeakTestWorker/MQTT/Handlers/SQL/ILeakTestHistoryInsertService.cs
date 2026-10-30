@@ -13,4 +13,8 @@ public interface ILeakTestHistoryInsertService
         string payload,
         string error,
         CancellationToken cancellationToken = default);
+
+    Task DeleteRejectedMessageAsync(long id, CancellationToken cancellationToken = default);
+
+    Task UpdateRejectedMessageFailureAsync(long id, string error, CancellationToken cancellationToken = default);
 }

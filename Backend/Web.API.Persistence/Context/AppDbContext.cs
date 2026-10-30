@@ -16,6 +16,7 @@ public class AppDbContext : DbContext
     public DbSet<Operator> Operators => Set<Operator>();
     public DbSet<LeakTestParameter> LeakTestParameters => Set<LeakTestParameter>();
     public DbSet<LeakTestJudgement> LeakTestJudgements => Set<LeakTestJudgement>();
+    public DbSet<RejectedMqttMessage> RejectedMqttMessages => Set<RejectedMqttMessage>();
     public DbSet<MeasurementUnit> MeasurementUnits => Set<MeasurementUnit>();
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
     public DbSet<LeakTestWorkRecord> LeakTestWorkRecords => Set<LeakTestWorkRecord>();
@@ -119,6 +120,21 @@ public class AppDbContext : DbContext
             entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             entity.HasIndex(x => x.JudgementCode).IsUnique();
             entity.HasIndex(x => x.Result);
+        });
+
+        modelBuilder.Entity<RejectedMqttMessage>(entity =>
+        {
+            entity.ToTable("leak_test_rejected_mqtt_messages");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.Topic).HasColumnName("topic").HasMaxLength(255).IsRequired();
+            entity.Property(x => x.Payload).HasColumnName("payload").IsRequired();
+            entity.Property(x => x.ErrorMessage).HasColumnName("error_message").IsRequired();
+            entity.Property(x => x.Status).HasColumnName("status").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.AttemptCount).HasColumnName("attempt_count");
+            entity.Property(x => x.ReceivedAt).HasColumnName("received_at");
+            entity.Property(x => x.LastAttemptAt).HasColumnName("last_attempt_at");
+            entity.Property(x => x.ProcessedAt).HasColumnName("processed_at");
         });
 
         modelBuilder.Entity<MeasurementUnit>(entity =>

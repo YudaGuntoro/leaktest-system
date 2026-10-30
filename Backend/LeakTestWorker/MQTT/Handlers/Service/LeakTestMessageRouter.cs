@@ -4,6 +4,7 @@ using LeakTestWorker.MQTT.Handlers.SQL;
 using LeakTestWorker.MQTT.Interfaces;
 using LeakTestWorker.Singletone;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace LeakTestWorker.MQTT.Handlers.Service;
 
@@ -34,24 +35,36 @@ public sealed class LeakTestMessageRouter : ILeakTestMessageHandler
     public async Task HandleAsync(string topic, string payload, CancellationToken cancellationToken = default)
     {
         var handler = ResolveHandler(topic);
+        var rejectedMessageId = ReadRejectedMessageId(payload);
 
         try
         {
             await handler.InsertAsync(topic, payload, cancellationToken);
+            if (rejectedMessageId.HasValue)
+            {
+                await _historyInsertService.DeleteRejectedMessageAsync(rejectedMessageId.Value, cancellationToken);
+            }
             await ReprocessBufferAsync(cancellationToken);
         }
         catch (Exception ex) when (ex is FormatException or JsonException)
         {
-            var rejectedId = await _historyInsertService.SaveRejectedMessageAsync(
-                topic,
-                payload,
-                ex.Message,
-                cancellationToken);
+            var rejectedId = rejectedMessageId.HasValue
+                ? rejectedMessageId.Value
+                : await _historyInsertService.SaveRejectedMessageAsync(topic, payload, ex.Message, cancellationToken);
+            if (rejectedMessageId.HasValue)
+            {
+                await _historyInsertService.UpdateRejectedMessageFailureAsync(rejectedId, ex.Message, cancellationToken);
+            }
             _logger.LogError(
                 ex,
                 "[MQTT] Invalid payload saved for review. RejectedMessageId={RejectedMessageId} Topic={Topic}",
                 rejectedId,
                 topic);
+        }
+        catch (Exception ex) when (rejectedMessageId.HasValue && !DbRetry.IsDatabaseException(ex) && ex is not OperationCanceledException)
+        {
+            await _historyInsertService.UpdateRejectedMessageFailureAsync(rejectedMessageId.Value, ex.Message, cancellationToken);
+            _logger.LogError(ex, "[MQTT] Reprocessed rejected payload failed. RejectedMessageId={RejectedMessageId}", rejectedMessageId.Value);
         }
         catch (Exception ex) when (DbRetry.IsDatabaseException(ex) && !cancellationToken.IsCancellationRequested)
         {
@@ -79,21 +92,46 @@ public sealed class LeakTestMessageRouter : ILeakTestMessageHandler
         BufferedLeakTestMessage message,
         CancellationToken cancellationToken)
     {
+        var rejectedMessageId = ReadRejectedMessageId(message.Payload);
         try
         {
             var handler = ResolveHandler(message.Topic);
             await handler.InsertAsync(message.Topic, message.Payload, cancellationToken);
+            if (rejectedMessageId.HasValue)
+            {
+                await _historyInsertService.DeleteRejectedMessageAsync(rejectedMessageId.Value, cancellationToken);
+            }
             return true;
         }
         catch (Exception ex) when (ex is FormatException or JsonException)
         {
-            _logger.LogError(ex, "[Buffer] Invalid buffered payload dropped. Topic={Topic}", message.Topic);
+            if (rejectedMessageId.HasValue)
+            {
+                await _historyInsertService.UpdateRejectedMessageFailureAsync(rejectedMessageId.Value, ex.Message, cancellationToken);
+            }
+            _logger.LogError(ex, "[Buffer] Invalid buffered payload failed. Topic={Topic}", message.Topic);
             return true;
         }
         catch (Exception ex) when (!DbRetry.IsDatabaseException(ex) && ex is not OperationCanceledException)
         {
+            if (rejectedMessageId.HasValue)
+            {
+                await _historyInsertService.UpdateRejectedMessageFailureAsync(rejectedMessageId.Value, ex.Message, cancellationToken);
+            }
             _logger.LogError(ex, "[Buffer] Buffered payload dropped because it is not recoverable. Topic={Topic}", message.Topic);
             return true;
+        }
+    }
+
+    private static long? ReadRejectedMessageId(string payload)
+    {
+        try
+        {
+            return JObject.Parse(payload)["_rejected_mqtt_message_id"]?.Value<long>();
+        }
+        catch (JsonException)
+        {
+            return null;
         }
     }
 

@@ -14,6 +14,10 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__DefaultConnection: ${MYSQL_CONNECTION_STRING}
+      MQTT__Host: ${MQTT_HOST:-host.docker.internal}
+      MQTT__Port: ${MQTT_PORT:-1883}
+      MQTT__Username: ${MQTT_USERNAME:-}
+      MQTT__Password: ${MQTT_PASSWORD:-}
       Jwt__Issuer: ${JWT_ISSUER:-LeaktesterWorkRecord}
       Jwt__Audience: ${JWT_AUDIENCE:-LeaktesterWorkRecord.Frontend}
       Jwt__SigningKey: ${JWT_SIGNING_KEY}

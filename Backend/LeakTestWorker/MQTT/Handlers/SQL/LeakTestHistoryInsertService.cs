@@ -48,6 +48,28 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
             cancellationToken: cancellationToken));
     }
 
+    public async Task DeleteRejectedMessageAsync(long id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new MySqlConnection(dbConfig.MysqlConnString);
+        await DbRetry.OpenWithRetryAsync(connection, _logger, "DELETE_REPROCESSED_MQTT", cancellationToken);
+        await EnsureRejectedMessagesTableAsync(connection, cancellationToken);
+        await connection.ExecuteAsync(new CommandDefinition(
+            "DELETE FROM leak_test_rejected_mqtt_messages WHERE id = @id;",
+            new { id },
+            cancellationToken: cancellationToken));
+    }
+
+    public async Task UpdateRejectedMessageFailureAsync(long id, string error, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new MySqlConnection(dbConfig.MysqlConnString);
+        await DbRetry.OpenWithRetryAsync(connection, _logger, "UPDATE_REJECTED_MQTT", cancellationToken);
+        await EnsureRejectedMessagesTableAsync(connection, cancellationToken);
+        await connection.ExecuteAsync(new CommandDefinition(
+            "UPDATE leak_test_rejected_mqtt_messages SET error_message = @error, status = 'Pending' WHERE id = @id;",
+            new { id, error },
+            cancellationToken: cancellationToken));
+    }
+
     private static async Task EnsureRejectedMessagesTableAsync(
         MySqlConnection connection,
         CancellationToken cancellationToken)
@@ -137,7 +159,7 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
         string? barcodeScan,
         CancellationToken cancellationToken)
     {
-        if (EvaluateWorkRecordResult(record.PressureInput, record.PressSetLow, record.PressSetUp, record.JudgementCode) != "NG")
+        if (EvaluateWorkRecordResult(record.JudgementCode) != "NG")
         {
             return;
         }
@@ -185,7 +207,7 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
             cancellationToken: cancellationToken));
 
         var ngCount = relatedRecords.Count(row =>
-            EvaluateWorkRecordResult(row.PressureInput, row.PressSetLow, row.PressSetUp, row.JudgementCode) == "NG");
+            EvaluateWorkRecordResult(row.JudgementCode) == "NG");
 
         if (ngCount < ReworkTriggerNgCount)
         {
@@ -215,33 +237,9 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
             cancellationToken: cancellationToken));
     }
 
-    private static string EvaluateWorkRecordResult(decimal pressureInput, decimal? lowerLimit, decimal? upperLimit, int? judgementCode)
+    private static string EvaluateWorkRecordResult(int? judgementCode)
     {
-        var normalizedInput = NormalizeCosmoPressure(pressureInput);
-        var normalizedLowerLimit = lowerLimit.HasValue ? NormalizeCosmoPressure(lowerLimit.Value) : (decimal?)null;
-        var normalizedUpperLimit = upperLimit.HasValue ? NormalizeCosmoPressure(upperLimit.Value) : (decimal?)null;
-
-        if (judgementCode != 2)
-        {
-            return "NG";
-        }
-
-        if (normalizedLowerLimit.HasValue && normalizedInput < normalizedLowerLimit.Value)
-        {
-            return "NG";
-        }
-
-        if (normalizedUpperLimit.HasValue && normalizedInput > normalizedUpperLimit.Value)
-        {
-            return "NG";
-        }
-
-        return "OK";
-    }
-
-    private static decimal NormalizeCosmoPressure(decimal value)
-    {
-        return Math.Abs(value) >= 10 ? Math.Round(value / 100, 2) : value;
+        return judgementCode == 2 ? "OK" : "NG";
     }
 
     private async Task<int> ResolveEngineModelIdAsync(

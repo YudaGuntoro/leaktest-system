@@ -5,6 +5,11 @@ using ClosedXML.Excel;
 using System.Globalization;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using MQTTnet;
+using MQTTnet.Client;
+using MQTTnet.Protocol;
 using Web.API.Domain.Production;
 using Web.API.Persistence.Context;
 using Web.API.Reports;
@@ -19,11 +24,13 @@ public class LeaktesterController : ApiControllerBase
 
     private readonly AppDbContext _db;
     private readonly IWebHostEnvironment _environment;
+    private readonly IConfiguration _configuration;
 
-    public LeaktesterController(AppDbContext db, IWebHostEnvironment environment)
+    public LeaktesterController(AppDbContext db, IWebHostEnvironment environment, IConfiguration configuration)
     {
         _db = db;
         _environment = environment;
+        _configuration = configuration;
     }
 
     [HttpGet("work-records")]
@@ -604,6 +611,118 @@ public class LeaktesterController : ApiControllerBase
 
             await _db.SaveChangesAsync();
             return ApiOk(await GetSystemSettingsResponseAsync(), "Settings updated successfully.");
+        }
+        catch (Exception ex)
+        {
+            return ApiBadRequest(ex);
+        }
+    }
+
+    [HttpGet("rejected-mqtt-messages")]
+    public async Task<IActionResult> RejectedMqttMessages()
+    {
+        try
+        {
+            var items = await _db.RejectedMqttMessages
+                .AsNoTracking()
+                .OrderByDescending(x => x.ReceivedAt)
+                .ThenByDescending(x => x.Id)
+                .ToListAsync();
+            return ApiOk(items);
+        }
+        catch (Exception ex)
+        {
+            return ApiBadRequest(ex);
+        }
+    }
+
+    [HttpPost("rejected-mqtt-messages/reprocess-all")]
+    public async Task<IActionResult> ReprocessRejectedMqttMessages(
+        [FromBody] ReprocessRejectedMqttMessagesRequest request)
+    {
+        try
+        {
+            if (request.Items.Count == 0)
+            {
+                throw new ArgumentException("There are no rejected MQTT messages to reprocess.");
+            }
+
+            var broker = LoadMqttBrokerStatusSettings();
+            var brokerHost = _configuration["MQTT:Host"] ?? broker.Host;
+            if (brokerHost is "0.0.0.0" or "::") brokerHost = "localhost";
+            var brokerPort = int.TryParse(_configuration["MQTT:Port"], out var configuredPort) && configuredPort > 0
+                ? configuredPort
+                : broker.Port;
+            var username = _configuration["MQTT:Username"] ?? ReadIniValue(ResolveMqttBrokerSettingsPath(), "Broker", "Username");
+            var password = _configuration["MQTT:Password"] ?? ReadIniValue(ResolveMqttBrokerSettingsPath(), "Broker", "Password");
+            var optionsBuilder = new MqttClientOptionsBuilder()
+                .WithClientId($"LeakTestReprocess-{Guid.NewGuid():N}")
+                .WithTcpServer(brokerHost, brokerPort)
+                .WithTimeout(TimeSpan.FromSeconds(10));
+            if (!string.IsNullOrWhiteSpace(username))
+            {
+                optionsBuilder.WithCredentials(username, password ?? string.Empty);
+            }
+
+            var client = new MqttFactory().CreateMqttClient();
+            var publishedIds = new List<long>();
+            var failedIds = new List<long>();
+            try
+            {
+                await client.ConnectAsync(optionsBuilder.Build(), HttpContext.RequestAborted);
+                foreach (var draft in request.Items.DistinctBy(x => x.Id))
+                {
+                    RejectedMqttMessage? item = null;
+                    try
+                    {
+                        item = await _db.RejectedMqttMessages.FirstOrDefaultAsync(x => x.Id == draft.Id);
+                        if (item is null || string.IsNullOrWhiteSpace(draft.Payload))
+                        {
+                            failedIds.Add(draft.Id);
+                            continue;
+                        }
+
+                        var payloadNode = JsonNode.Parse(draft.Payload)?.AsObject()
+                            ?? throw new ArgumentException($"Payload for message {draft.Id} must be a JSON object.");
+                        payloadNode["_rejected_mqtt_message_id"] = item.Id;
+                        item.Payload = draft.Payload;
+                        item.AttemptCount += 1;
+                        item.LastAttemptAt = DateTime.Now;
+                        item.Status = "Published";
+                        await _db.SaveChangesAsync(HttpContext.RequestAborted);
+
+                        var message = new MqttApplicationMessageBuilder()
+                            .WithTopic(item.Topic)
+                            .WithPayload(payloadNode.ToJsonString())
+                            .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce)
+                            .Build();
+                        await client.PublishAsync(message, HttpContext.RequestAborted);
+                        publishedIds.Add(item.Id);
+                    }
+                    catch
+                    {
+                        if (item is not null)
+                        {
+                            item.Status = "Pending";
+                            try
+                            {
+                                await _db.SaveChangesAsync(HttpContext.RequestAborted);
+                            }
+                            catch
+                            {
+                                // Keep the rejected row available even if its status cannot be refreshed.
+                            }
+                        }
+                        failedIds.Add(draft.Id);
+                    }
+                }
+            }
+            finally
+            {
+                client.Dispose();
+            }
+
+            return ApiOk(new { published_ids = publishedIds, failed_ids = failedIds }, "Rejected MQTT payloads sent to the worker.");
         }
         catch (Exception ex)
         {
@@ -1674,36 +1793,12 @@ DEALLOCATE PREPARE stmt;");
 
     private static string EvaluateWorkRecordResult(LeakTestWorkRecord record)
     {
-        var lowerLimit = ParsePressureValue(record.ParameterMin) ??
-            (record.PressSetLow.HasValue ? NormalizeCosmoPressure(record.PressSetLow.Value) : null);
-        var upperLimit = ParsePressureValue(record.ParameterMax) ??
-            (record.PressSetUp.HasValue ? NormalizeCosmoPressure(record.PressSetUp.Value) : null);
-
-        return EvaluateWorkRecordResult(record.PressureInput, lowerLimit, upperLimit, record.JudgementCode);
+        return EvaluateWorkRecordResult(record.JudgementCode);
     }
 
-    private static string EvaluateWorkRecordResult(decimal pressureInput, decimal? lowerLimit, decimal? upperLimit, int? judgementCode)
+    private static string EvaluateWorkRecordResult(int? judgementCode)
     {
-        var normalizedInput = NormalizeCosmoPressure(pressureInput);
-        var normalizedLowerLimit = lowerLimit.HasValue ? NormalizeCosmoPressure(lowerLimit.Value) : (decimal?)null;
-        var normalizedUpperLimit = upperLimit.HasValue ? NormalizeCosmoPressure(upperLimit.Value) : (decimal?)null;
-
-        if (judgementCode != 2)
-        {
-            return "NG";
-        }
-
-        if (normalizedLowerLimit.HasValue && normalizedInput < normalizedLowerLimit.Value)
-        {
-            return "NG";
-        }
-
-        if (normalizedUpperLimit.HasValue && normalizedInput > normalizedUpperLimit.Value)
-        {
-            return "NG";
-        }
-
-        return "OK";
+        return judgementCode == 2 ? "OK" : "NG";
     }
 
     private static string WorkRecordEngineKey(LeakTestWorkRecord record)

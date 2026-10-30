@@ -53,7 +53,7 @@ public static class LeakTestPayloadMapper
         var message = new LeakTestPayload
         {
             Topic = topic,
-            RawJson = payload,
+            RawJson = RemoveReprocessMarker(payload),
             Data = SelectDataObject(root)
         };
 
@@ -98,6 +98,20 @@ public static class LeakTestPayloadMapper
 
         Validate(record);
         return record;
+    }
+
+    private static string RemoveReprocessMarker(string payload)
+    {
+        try
+        {
+            var root = JObject.Parse(payload);
+            root.Remove("_rejected_mqtt_message_id");
+            return root.ToString(Newtonsoft.Json.Formatting.None);
+        }
+        catch
+        {
+            return payload;
+        }
     }
 
     private static JObject SelectDataObject(JObject root)
