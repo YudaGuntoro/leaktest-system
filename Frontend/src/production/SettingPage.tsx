@@ -127,7 +127,7 @@ export default function SettingPage() {
     setMessage(null);
     try {
       const result = await apiRequest<{
-        published_ids: number[];
+        processed_ids: number[];
         failed_ids: number[];
         skipped_ids: number[];
         deduplicated_ids: number[];
@@ -139,7 +139,7 @@ export default function SettingPage() {
       const failureIds = result.failed_ids.join(", ");
       setMessage({
         kind: result.failed_ids.length === 0 ? "ok" : "error",
-        text: `${result.published_ids.length} payload terkirim ke MQTT; ${result.failed_ids.length} gagal dikirim; ${result.deduplicated_ids.length} duplikat identik digabung menjadi satu; ${result.skipped_ids.length} dilewati karena sudah Published.${failureIds ? ` ID gagal: ${failureIds}.` : ""} Alasan gagal ditampilkan pada kolom Error.`,
+        text: `${result.processed_ids.length} payload berhasil masuk ke Leak Test Work Record; ${result.failed_ids.length} gagal diproses; ${result.deduplicated_ids.length} duplikat identik digabung menjadi satu; ${result.skipped_ids.length} dilewati karena tidak lagi Pending.${failureIds ? ` ID gagal: ${failureIds}.` : ""} Alasan gagal ditampilkan pada kolom Error.`,
       });
       window.setTimeout(() => void loadRejectedMessages(), 1000);
     } catch (err) {
@@ -499,7 +499,7 @@ export default function SettingPage() {
         {reprocessingAll ? (
           <div className="flex items-center gap-3 border-b border-blue-200 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-800 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-200" role="status" aria-live="polite">
             <span className="size-4 animate-spin rounded-full border-2 border-blue-300 border-t-blue-700 dark:border-blue-500/40 dark:border-t-blue-200" aria-hidden="true" />
-            <span>On Progress — sedang mengirim payload. Loading time: {Math.floor(reprocessElapsedSeconds / 60)}m {reprocessElapsedSeconds % 60}s</span>
+            <span>On Progress — sedang menyimpan payload ke Leak Test Work Record. Loading time: {Math.floor(reprocessElapsedSeconds / 60)}m {reprocessElapsedSeconds % 60}s</span>
           </div>
         ) : null}
         <div className="overflow-auto p-5">

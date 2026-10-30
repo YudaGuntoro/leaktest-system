@@ -1,15 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using LeakTestWorker.Domains.Mappings;
+using LeakTestWorker.MQTT.Handlers.SQL;
 using ClosedXML.Excel;
 using System.Globalization;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using MQTTnet;
-using MQTTnet.Client;
-using MQTTnet.Protocol;
 using Web.API.Domain.Production;
 using Web.API.Persistence.Context;
 using Web.API.Reports;
@@ -25,12 +24,14 @@ public class LeaktesterController : ApiControllerBase
     private readonly AppDbContext _db;
     private readonly IWebHostEnvironment _environment;
     private readonly IConfiguration _configuration;
+    private readonly ILoggerFactory _loggerFactory;
 
-    public LeaktesterController(AppDbContext db, IWebHostEnvironment environment, IConfiguration configuration)
+    public LeaktesterController(AppDbContext db, IWebHostEnvironment environment, IConfiguration configuration, ILoggerFactory loggerFactory)
     {
         _db = db;
         _environment = environment;
         _configuration = configuration;
+        _loggerFactory = loggerFactory;
     }
 
     [HttpGet("work-records")]
@@ -647,130 +648,102 @@ public class LeaktesterController : ApiControllerBase
                 throw new ArgumentException("There are no rejected MQTT messages to reprocess.");
             }
 
-            var broker = LoadMqttBrokerStatusSettings();
-            var brokerHost = _configuration["MQTT:Host"] ?? broker.Host;
-            if (brokerHost is "0.0.0.0" or "::") brokerHost = "localhost";
-            var brokerPort = int.TryParse(_configuration["MQTT:Port"], out var configuredPort) && configuredPort > 0
-                ? configuredPort
-                : broker.Port;
-            var username = _configuration["MQTT:Username"] ?? ReadIniValue(ResolveMqttBrokerSettingsPath(), "Broker", "Username");
-            var password = _configuration["MQTT:Password"] ?? ReadIniValue(ResolveMqttBrokerSettingsPath(), "Broker", "Password");
-            var optionsBuilder = new MqttClientOptionsBuilder()
-                .WithClientId($"LeakTestReprocess-{Guid.NewGuid():N}")
-                .WithTcpServer(brokerHost, brokerPort)
-                .WithTimeout(TimeSpan.FromSeconds(10));
-            if (!string.IsNullOrWhiteSpace(username))
-            {
-                optionsBuilder.WithCredentials(username, password ?? string.Empty);
-            }
-
-            var client = new MqttFactory().CreateMqttClient();
-            var publishedIds = new List<long>();
+            var processedIds = new List<long>();
             var failedIds = new List<long>();
             var skippedIds = new List<long>();
             var deduplicatedIds = new List<long>();
             var failureReasons = new List<(long Id, string Error)>();
-            try
+            var distinctDrafts = request.Items.DistinctBy(x => x.Id).ToList();
+            var requestedIds = distinctDrafts.Select(x => x.Id).ToList();
+            var requestedRows = await _db.RejectedMqttMessages
+                .Where(x => requestedIds.Contains(x.Id))
+                .ToListAsync(HttpContext.RequestAborted);
+            var rowsById = requestedRows.ToDictionary(x => x.Id);
+            var duplicateDraftIds = distinctDrafts
+                .Where(draft => rowsById.TryGetValue(draft.Id, out var row)
+                    && string.Equals(row.Status, "Pending", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(draft.Payload))
+                .Select(draft => new { Draft = draft, Row = rowsById[draft.Id] })
+                .GroupBy(x => (x.Row.Topic, x.Draft.Payload))
+                .SelectMany(group => group.OrderBy(x => x.Row.Id).Skip(1).Select(x => x.Row.Id))
+                .ToList();
+            if (duplicateDraftIds.Count > 0)
             {
-                var distinctDrafts = request.Items.DistinctBy(x => x.Id).ToList();
-                var requestedIds = distinctDrafts.Select(x => x.Id).ToList();
-                var requestedRows = await _db.RejectedMqttMessages
-                    .Where(x => requestedIds.Contains(x.Id))
-                    .ToListAsync(HttpContext.RequestAborted);
-                var rowsById = requestedRows.ToDictionary(x => x.Id);
-                var duplicateDraftIds = distinctDrafts
-                    .Where(draft => rowsById.TryGetValue(draft.Id, out var row)
-                        && string.Equals(row.Status, "Pending", StringComparison.OrdinalIgnoreCase)
-                        && !string.IsNullOrWhiteSpace(draft.Payload))
-                    .Select(draft => new { Draft = draft, Row = rowsById[draft.Id] })
-                    .GroupBy(x => (x.Row.Topic, x.Draft.Payload))
-                    .SelectMany(group => group.OrderBy(x => x.Row.Id).Skip(1).Select(x => x.Row.Id))
-                    .ToList();
-                if (duplicateDraftIds.Count > 0)
-                {
-                    var duplicateRows = requestedRows.Where(x => duplicateDraftIds.Contains(x.Id)).ToList();
-                    _db.RejectedMqttMessages.RemoveRange(duplicateRows);
-                    await _db.SaveChangesAsync(HttpContext.RequestAborted);
-                    deduplicatedIds.AddRange(duplicateDraftIds);
-                }
-
-                await client.ConnectAsync(optionsBuilder.Build(), HttpContext.RequestAborted);
-                foreach (var draft in distinctDrafts.Where(x => !duplicateDraftIds.Contains(x.Id)))
-                {
-                    RejectedMqttMessage? item = null;
-                    try
-                    {
-                        item = await _db.RejectedMqttMessages.FirstOrDefaultAsync(x => x.Id == draft.Id);
-                        if (item is null)
-                        {
-                            failedIds.Add(draft.Id);
-                            failureReasons.Add((draft.Id, "Rejected message was not found."));
-                            continue;
-                        }
-
-                        if (!string.Equals(item.Status, "Pending", StringComparison.OrdinalIgnoreCase))
-                        {
-                            skippedIds.Add(draft.Id);
-                            continue;
-                        }
-
-                        if (string.IsNullOrWhiteSpace(draft.Payload))
-                        {
-                            failedIds.Add(draft.Id);
-                            failureReasons.Add((draft.Id, "Payload is empty."));
-                            continue;
-                        }
-
-                        var payloadNode = JsonNode.Parse(draft.Payload)?.AsObject()
-                            ?? throw new ArgumentException($"Payload for message {draft.Id} must be a JSON object.");
-                        payloadNode["_rejected_mqtt_message_id"] = item.Id;
-                        item.Payload = draft.Payload;
-                        item.AttemptCount += 1;
-                        item.LastAttemptAt = DateTime.Now;
-                        item.Status = "Published";
-                        await _db.SaveChangesAsync(HttpContext.RequestAborted);
-
-                        var message = new MqttApplicationMessageBuilder()
-                            .WithTopic(item.Topic)
-                            .WithPayload(payloadNode.ToJsonString())
-                            .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce)
-                            .Build();
-                        await client.PublishAsync(message, HttpContext.RequestAborted);
-                        publishedIds.Add(item.Id);
-                    }
-                    catch (Exception ex)
-                    {
-                        if (item is not null)
-                        {
-                            item.Status = "Pending";
-                            item.ErrorMessage = $"Reprocess publish failed: {ex.Message}";
-                            try
-                            {
-                                await _db.SaveChangesAsync(HttpContext.RequestAborted);
-                            }
-                            catch
-                            {
-                                // Keep the rejected row available even if its status cannot be refreshed.
-                            }
-                        }
-                        failedIds.Add(draft.Id);
-                        failureReasons.Add((draft.Id, ex.Message));
-                    }
-                }
+                var duplicateRows = requestedRows.Where(x => duplicateDraftIds.Contains(x.Id)).ToList();
+                _db.RejectedMqttMessages.RemoveRange(duplicateRows);
+                await _db.SaveChangesAsync(HttpContext.RequestAborted);
+                deduplicatedIds.AddRange(duplicateDraftIds);
             }
-            finally
+
+            var historyInsertService = new LeakTestHistoryInsertService(
+                _loggerFactory.CreateLogger<LeakTestHistoryInsertService>(),
+                _db.Database.GetConnectionString());
+            foreach (var draft in distinctDrafts.Where(x => !duplicateDraftIds.Contains(x.Id)))
             {
-                client.Dispose();
+                RejectedMqttMessage? item = null;
+                try
+                {
+                    item = await _db.RejectedMqttMessages.FirstOrDefaultAsync(x => x.Id == draft.Id);
+                    if (item is null)
+                    {
+                        failedIds.Add(draft.Id);
+                        failureReasons.Add((draft.Id, "Rejected message was not found."));
+                        continue;
+                    }
+
+                    if (!string.Equals(item.Status, "Pending", StringComparison.OrdinalIgnoreCase))
+                    {
+                        skippedIds.Add(draft.Id);
+                        continue;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(draft.Payload))
+                    {
+                        failedIds.Add(draft.Id);
+                        failureReasons.Add((draft.Id, "Payload is empty."));
+                        continue;
+                    }
+
+                    item.Payload = draft.Payload;
+                    item.AttemptCount += 1;
+                    item.LastAttemptAt = DateTime.Now;
+                    await _db.SaveChangesAsync(HttpContext.RequestAborted);
+
+                    var payloadNode = JsonNode.Parse(draft.Payload)?.AsObject()
+                        ?? throw new ArgumentException($"Payload for message {draft.Id} must be a JSON object.");
+                    payloadNode["_rejected_mqtt_message_id"] = item.Id;
+                    var record = LeakTestPayloadMapper.ToHistoryRecord(item.Topic, payloadNode.ToJsonString());
+                    await historyInsertService.InsertAsync(record, HttpContext.RequestAborted);
+                    processedIds.Add(item.Id);
+                }
+                catch (Exception ex)
+                {
+                    if (item is not null)
+                    {
+                        item.Status = "Pending";
+                        item.ErrorMessage = ex.Message;
+                        try
+                        {
+                            await _db.SaveChangesAsync(HttpContext.RequestAborted);
+                        }
+                        catch
+                        {
+                            // Preserve the rejected record if the failure details cannot be saved.
+                        }
+                    }
+                    failedIds.Add(draft.Id);
+                    failureReasons.Add((draft.Id, ex.Message));
+                }
             }
 
             return ApiOk(new
             {
-                published_ids = publishedIds,
+                processed_ids = processedIds,
                 failed_ids = failedIds,
                 skipped_ids = skippedIds,
                 deduplicated_ids = deduplicatedIds,
                 failure_reasons = failureReasons.Select(x => new { id = x.Id, error = x.Error })
-            }, "Rejected MQTT payloads sent to the worker.");
+            }, "Rejected MQTT payloads processed directly into work records.");
         }
         catch (Exception ex)
         {

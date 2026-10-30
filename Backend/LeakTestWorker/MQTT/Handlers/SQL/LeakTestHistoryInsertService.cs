@@ -13,15 +13,17 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
     private const int ReworkTriggerNgCount = 3;
 
     private readonly ILogger<LeakTestHistoryInsertService> _logger;
+    private readonly string _connectionString;
 
-    public LeakTestHistoryInsertService(ILogger<LeakTestHistoryInsertService> logger)
+    public LeakTestHistoryInsertService(ILogger<LeakTestHistoryInsertService> logger, string? connectionString = null)
     {
         _logger = logger;
+        _connectionString = string.IsNullOrWhiteSpace(connectionString) ? dbConfig.MysqlConnString : connectionString;
     }
 
     public async Task WaitUntilReadyAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = new MySqlConnection(dbConfig.MysqlConnString);
+        await using var connection = new MySqlConnection(_connectionString);
         await DbRetry.OpenWithRetryAsync(connection, _logger, "DB_WARMUP", cancellationToken, maxRetry: 60);
         await EnsureRejectedMessagesTableAsync(connection, cancellationToken);
         _logger.LogInformation("[DB] READY");
@@ -33,7 +35,7 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
         string error,
         CancellationToken cancellationToken = default)
     {
-        await using var connection = new MySqlConnection(dbConfig.MysqlConnString);
+        await using var connection = new MySqlConnection(_connectionString);
         await DbRetry.OpenWithRetryAsync(connection, _logger, "SAVE_REJECTED_MQTT", cancellationToken);
         await EnsureRejectedMessagesTableAsync(connection, cancellationToken);
 
@@ -52,7 +54,7 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
 
     public async Task DeleteRejectedMessageAsync(long id, CancellationToken cancellationToken = default)
     {
-        await using var connection = new MySqlConnection(dbConfig.MysqlConnString);
+        await using var connection = new MySqlConnection(_connectionString);
         await DbRetry.OpenWithRetryAsync(connection, _logger, "DELETE_REPROCESSED_MQTT", cancellationToken);
         await EnsureRejectedMessagesTableAsync(connection, cancellationToken);
         await connection.ExecuteAsync(new CommandDefinition(
@@ -61,9 +63,20 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
             cancellationToken: cancellationToken));
     }
 
+    private static Task DeleteRejectedMessageAsync(
+        MySqlConnection connection,
+        MySqlTransaction transaction,
+        long id,
+        CancellationToken cancellationToken) =>
+        connection.ExecuteAsync(new CommandDefinition(
+            "DELETE FROM leak_test_rejected_mqtt_messages WHERE id = @id;",
+            new { id },
+            transaction,
+            cancellationToken: cancellationToken));
+
     public async Task UpdateRejectedMessageFailureAsync(long id, string error, CancellationToken cancellationToken = default)
     {
-        await using var connection = new MySqlConnection(dbConfig.MysqlConnString);
+        await using var connection = new MySqlConnection(_connectionString);
         await DbRetry.OpenWithRetryAsync(connection, _logger, "UPDATE_REJECTED_MQTT", cancellationToken);
         await EnsureRejectedMessagesTableAsync(connection, cancellationToken);
         await connection.ExecuteAsync(new CommandDefinition(
@@ -96,8 +109,9 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
 
     public async Task<long> InsertAsync(LeakTestHistoryRecord record, CancellationToken cancellationToken = default)
     {
-        await using var connection = new MySqlConnection(dbConfig.MysqlConnString);
+        await using var connection = new MySqlConnection(_connectionString);
         await DbRetry.OpenWithRetryAsync(connection, _logger, "INSERT_HISTORY", cancellationToken);
+        await EnsureRejectedMessagesTableAsync(connection, cancellationToken);
         await EnsureHmiColumnsAsync(connection, cancellationToken);
         await EnsureJudgementMasterAsync(connection, cancellationToken);
         await EnsureReworkEngineTableAsync(connection, cancellationToken);
@@ -131,6 +145,10 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
                     cancellationToken: cancellationToken));
                 if (existingPayloadId.HasValue)
                 {
+                    if (record.RejectedMqttMessageId.HasValue)
+                    {
+                        await DeleteRejectedMessageAsync(connection, transaction, record.RejectedMqttMessageId.Value, cancellationToken);
+                    }
                     await transaction.CommitAsync(cancellationToken);
                     return existingPayloadId.Value;
                 }
@@ -145,6 +163,7 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
                     cancellationToken: cancellationToken));
                 if (existingId.HasValue)
                 {
+                    await DeleteRejectedMessageAsync(connection, transaction, record.RejectedMqttMessageId.Value, cancellationToken);
                     await transaction.CommitAsync(cancellationToken);
                     return existingId.Value;
                 }
@@ -189,6 +208,11 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
                 cancellationToken: cancellationToken));
 
             await PromoteToReworkEngineIfNeededAsync(connection, transaction, engineModelId, record, barcodeScan, cancellationToken);
+
+            if (record.RejectedMqttMessageId.HasValue)
+            {
+                await DeleteRejectedMessageAsync(connection, transaction, record.RejectedMqttMessageId.Value, cancellationToken);
+            }
 
             await transaction.CommitAsync(cancellationToken);
             return insertedId;
