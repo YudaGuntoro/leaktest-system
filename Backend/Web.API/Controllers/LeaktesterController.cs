@@ -662,7 +662,6 @@ public class LeaktesterController : ApiControllerBase
             var rowsById = requestedRows.ToDictionary(x => x.Id);
             var duplicateDraftIds = distinctDrafts
                 .Where(draft => rowsById.TryGetValue(draft.Id, out var row)
-                    && string.Equals(row.Status, "Pending", StringComparison.OrdinalIgnoreCase)
                     && !string.IsNullOrWhiteSpace(draft.Payload))
                 .Select(draft => new { Draft = draft, Row = rowsById[draft.Id] })
                 .GroupBy(x => (x.Row.Topic, x.Draft.Payload))
@@ -689,12 +688,6 @@ public class LeaktesterController : ApiControllerBase
                     {
                         failedIds.Add(draft.Id);
                         failureReasons.Add((draft.Id, "Rejected message was not found."));
-                        continue;
-                    }
-
-                    if (!string.Equals(item.Status, "Pending", StringComparison.OrdinalIgnoreCase))
-                    {
-                        skippedIds.Add(draft.Id);
                         continue;
                     }
 

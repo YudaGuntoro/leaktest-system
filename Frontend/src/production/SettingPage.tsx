@@ -119,8 +119,8 @@ export default function SettingPage() {
   }, []);
 
   async function reprocessAllRejectedMessages() {
-    const pendingMessages = rejectedMessages.filter((row) => row.status.toLowerCase() === "pending");
-    if (pendingMessages.length === 0) return;
+    const messagesToReprocess = rejectedMessages;
+    if (messagesToReprocess.length === 0) return;
     setReprocessingAll(true);
     setReprocessElapsedSeconds(0);
     setReprocessStartedAt(Date.now());
@@ -134,12 +134,12 @@ export default function SettingPage() {
         failure_reasons: { id: number; error: string }[];
       }>("/api/leaktester/rejected-mqtt-messages/reprocess-all", {
         method: "POST",
-        body: JSON.stringify({ items: pendingMessages.map((row) => ({ id: row.id, payload: buildEditedPayload(row) })) }),
+        body: JSON.stringify({ items: messagesToReprocess.map((row) => ({ id: row.id, payload: buildEditedPayload(row) })) }),
       });
       const failureIds = result.failed_ids.join(", ");
       setMessage({
         kind: result.failed_ids.length === 0 ? "ok" : "error",
-        text: `${result.processed_ids.length} payload berhasil masuk ke Leak Test Work Record; ${result.failed_ids.length} gagal diproses; ${result.deduplicated_ids.length} duplikat identik digabung menjadi satu; ${result.skipped_ids.length} dilewati karena tidak lagi Pending.${failureIds ? ` ID gagal: ${failureIds}.` : ""} Alasan gagal ditampilkan pada kolom Error.`,
+        text: `${result.processed_ids.length} payload berhasil masuk ke Leak Test Work Record; ${result.failed_ids.length} gagal diproses; ${result.deduplicated_ids.length} duplikat identik digabung menjadi satu; ${result.skipped_ids.length} dilewati karena barisnya sudah tidak ada.${failureIds ? ` ID gagal: ${failureIds}.` : ""} Alasan gagal ditampilkan pada kolom Error.`,
       });
       window.setTimeout(() => void loadRejectedMessages(), 1000);
     } catch (err) {
@@ -477,15 +477,15 @@ export default function SettingPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-5 dark:border-slate-800">
           <div>
             <h2 id="unprocessed-data-title" className="text-base font-bold text-slate-900 dark:text-white">Unprocessed MQTT Data</h2>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Hanya data berstatus Pending yang dikirim. Data Published tidak dikirim ulang.</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Semua data rejected diproses langsung ke Work Record. Jika record sudah ada, data tidak dibuat ganda dan baris rejected akan dibersihkan.</p>
           </div>
           <div className="flex gap-2">
             <button className={backupActionClass} onClick={() => setShowRejectedList(false)} type="button">Close</button>
             <button className={backupActionClass} onClick={() => void loadRejectedMessages()} type="button" disabled={loadingRejected || reprocessingAll}>
               {loadingRejected ? "Loading..." : "Refresh"}
             </button>
-            <button className="h-12 rounded-lg bg-brand-500 px-5 text-sm font-bold text-white hover:bg-brand-600 disabled:opacity-60" onClick={() => void reprocessAllRejectedMessages()} type="button" disabled={!rejectedMessages.some((row) => row.status.toLowerCase() === "pending") || reprocessingAll || loadingRejected}>
-              {reprocessingAll ? "Sending..." : `Reprocess Pending (${rejectedMessages.filter((row) => row.status.toLowerCase() === "pending").length})`}
+            <button className="h-12 rounded-lg bg-brand-500 px-5 text-sm font-bold text-white hover:bg-brand-600 disabled:opacity-60" onClick={() => void reprocessAllRejectedMessages()} type="button" disabled={rejectedMessages.length === 0 || reprocessingAll || loadingRejected}>
+              {reprocessingAll ? "Processing..." : `Reprocess All (${rejectedMessages.length})`}
             </button>
           </div>
         </div>
