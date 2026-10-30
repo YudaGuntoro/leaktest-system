@@ -77,7 +77,17 @@ export default function SettingPage() {
   const [loadingRejected, setLoadingRejected] = useState(false);
   const [showRejectedList, setShowRejectedList] = useState(false);
   const [reprocessingAll, setReprocessingAll] = useState(false);
+  const [reprocessStartedAt, setReprocessStartedAt] = useState<number | null>(null);
+  const [reprocessElapsedSeconds, setReprocessElapsedSeconds] = useState(0);
   const [message, setMessage] = useState<PageMessage | null>(null);
+
+  useEffect(() => {
+    if (reprocessStartedAt === null) return;
+    const updateElapsed = () => setReprocessElapsedSeconds(Math.floor((Date.now() - reprocessStartedAt) / 1000));
+    updateElapsed();
+    const timer = window.setInterval(updateElapsed, 1000);
+    return () => window.clearInterval(timer);
+  }, [reprocessStartedAt]);
 
   useEffect(() => {
     let ignore = false;
@@ -111,6 +121,8 @@ export default function SettingPage() {
   async function reprocessAllRejectedMessages() {
     if (rejectedMessages.length === 0) return;
     setReprocessingAll(true);
+    setReprocessElapsedSeconds(0);
+    setReprocessStartedAt(Date.now());
     setMessage(null);
     try {
       const result = await apiRequest<{ published_ids: number[]; failed_ids: number[] }>("/api/leaktester/rejected-mqtt-messages/reprocess-all", {
@@ -126,6 +138,7 @@ export default function SettingPage() {
       setMessage({ kind: "error", text: err instanceof Error ? err.message : "Failed to reprocess rejected MQTT messages." });
     } finally {
       setReprocessingAll(false);
+      setReprocessStartedAt(null);
     }
   }
 
@@ -473,6 +486,12 @@ export default function SettingPage() {
             ? "border-b border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-medium text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300"
             : "border-b border-red-200 bg-red-50 px-5 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"}>
             {message.text}
+          </div>
+        ) : null}
+        {reprocessingAll ? (
+          <div className="flex items-center gap-3 border-b border-blue-200 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-800 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-200" role="status" aria-live="polite">
+            <span className="size-4 animate-spin rounded-full border-2 border-blue-300 border-t-blue-700 dark:border-blue-500/40 dark:border-t-blue-200" aria-hidden="true" />
+            <span>On Progress — sedang mengirim payload. Loading time: {Math.floor(reprocessElapsedSeconds / 60)}m {reprocessElapsedSeconds % 60}s</span>
           </div>
         ) : null}
         <div className="overflow-auto p-5">
