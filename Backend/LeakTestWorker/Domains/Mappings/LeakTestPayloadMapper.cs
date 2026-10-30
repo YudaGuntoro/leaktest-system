@@ -77,6 +77,7 @@ public static class LeakTestPayloadMapper
         var judgementCode = ReadInt(message.Data, "judgement", "Judgement", "judgement_code", "JudgementCode");
         var record = new LeakTestHistoryRecord
         {
+            RejectedMqttMessageId = root["_rejected_mqtt_message_id"]?.Value<long?>(),
             EngineModelId = ReadInt(message.Data, "engine_model_id", "engineModelId", "EngineModelId", "model_id", "ModelId"),
             EngineModel = engineModel,
             EngineNumber = engineNumber ?? string.Empty,

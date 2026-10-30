@@ -2,6 +2,8 @@ namespace LeakTestWorker.Domains.Models;
 
 public sealed class LeakTestHistoryRecord
 {
+    public long? RejectedMqttMessageId { get; init; }
+
     public int? EngineModelId { get; init; }
 
     public string? EngineModel { get; init; }

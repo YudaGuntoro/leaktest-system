@@ -99,19 +99,35 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
         await EnsureHmiColumnsAsync(connection, cancellationToken);
         await EnsureJudgementMasterAsync(connection, cancellationToken);
         await EnsureReworkEngineTableAsync(connection, cancellationToken);
+        await EnsureColumnAsync(connection, "rejected_mqtt_message_id", "ALTER TABLE leak_test_work_records ADD COLUMN rejected_mqtt_message_id BIGINT NULL AFTER source_payload", cancellationToken);
+        await EnsureIndexAsync(connection, "ux_leak_test_work_records_rejected_mqtt_message_id", "CREATE UNIQUE INDEX ux_leak_test_work_records_rejected_mqtt_message_id ON leak_test_work_records (rejected_mqtt_message_id)", cancellationToken);
 
         using var transaction = connection.BeginTransaction();
         try
         {
+            if (record.RejectedMqttMessageId.HasValue)
+            {
+                var existingId = await connection.ExecuteScalarAsync<long?>(new CommandDefinition(
+                    "SELECT id FROM leak_test_work_records WHERE rejected_mqtt_message_id = @id LIMIT 1 FOR UPDATE;",
+                    new { id = record.RejectedMqttMessageId.Value },
+                    transaction,
+                    cancellationToken: cancellationToken));
+                if (existingId.HasValue)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                    return existingId.Value;
+                }
+            }
+
             var engineModelId = await ResolveEngineModelIdAsync(connection, transaction, record, cancellationToken);
             var barcodeScan = FirstText(record.BarcodeScan, BuildBarcodeScan(record.EngineModel, record.EngineNumber));
 
             await connection.ExecuteAsync(new CommandDefinition(
                 """
                 INSERT INTO leak_test_work_records
-                    (engine_model_id, engine_number, barcode_scan, check_date, check_time, machine_name, operator_name, parameter_pressure, channel_no, press_set_up, press_set_low, pressure_input, cycle_time_leak_test_minutes, judgement_code, source_payload, created_at, updated_at)
+                    (engine_model_id, engine_number, barcode_scan, check_date, check_time, machine_name, operator_name, parameter_pressure, channel_no, press_set_up, press_set_low, pressure_input, cycle_time_leak_test_minutes, judgement_code, source_payload, rejected_mqtt_message_id, created_at, updated_at)
                 VALUES
-                    (@engine_model_id, @engine_number, @barcode_scan, @check_date, @check_time, @machine_name, @operator_name, @parameter_pressure, @channel_no, @press_set_up, @press_set_low, @pressure_input, @cycle_time, @judgement_code, @source_payload, NOW(), NOW());
+                    (@engine_model_id, @engine_number, @barcode_scan, @check_date, @check_time, @machine_name, @operator_name, @parameter_pressure, @channel_no, @press_set_up, @press_set_low, @pressure_input, @cycle_time, @judgement_code, @source_payload, @rejected_mqtt_message_id, NOW(), NOW());
                 """,
                 new
                 {
@@ -129,7 +145,8 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
                     pressure_input = record.PressureInput,
                     cycle_time = record.CycleTimeLeakTestMinutes,
                     judgement_code = record.JudgementCode,
-                    source_payload = record.RawPayload
+                    source_payload = record.RawPayload,
+                    rejected_mqtt_message_id = record.RejectedMqttMessageId
                 },
                 transaction,
                 cancellationToken: cancellationToken));
@@ -143,6 +160,19 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
 
             await transaction.CommitAsync(cancellationToken);
             return insertedId;
+        }
+        catch (MySqlException ex) when (ex.Number == 1062 && record.RejectedMqttMessageId.HasValue)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            var existingId = await connection.ExecuteScalarAsync<long?>(new CommandDefinition(
+                "SELECT id FROM leak_test_work_records WHERE rejected_mqtt_message_id = @id LIMIT 1;",
+                new { id = record.RejectedMqttMessageId.Value },
+                cancellationToken: cancellationToken));
+            if (existingId.HasValue)
+            {
+                return existingId.Value;
+            }
+            throw;
         }
         catch
         {
