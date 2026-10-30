@@ -125,13 +125,18 @@ export default function SettingPage() {
     setReprocessStartedAt(Date.now());
     setMessage(null);
     try {
-      const result = await apiRequest<{ published_ids: number[]; failed_ids: number[] }>("/api/leaktester/rejected-mqtt-messages/reprocess-all", {
+      const result = await apiRequest<{
+        published_ids: number[];
+        failed_ids: number[];
+        failure_reasons: { id: number; error: string }[];
+      }>("/api/leaktester/rejected-mqtt-messages/reprocess-all", {
         method: "POST",
         body: JSON.stringify({ items: rejectedMessages.map((row) => ({ id: row.id, payload: buildEditedPayload(row) })) }),
       });
+      const failureIds = result.failed_ids.join(", ");
       setMessage({
         kind: result.failed_ids.length === 0 ? "ok" : "error",
-        text: `${result.published_ids.length} payload dikirim; ${result.failed_ids.length} payload gagal dikirim. Payload yang gagal diproses worker akan tetap di tabel.`,
+        text: `${result.published_ids.length} payload terkirim ke MQTT; ${result.failed_ids.length} gagal dikirim.${failureIds ? ` ID gagal: ${failureIds}.` : ""} Alasan gagal ditampilkan pada kolom Error.`,
       });
       window.setTimeout(() => void loadRejectedMessages(), 1000);
     } catch (err) {
@@ -495,10 +500,11 @@ export default function SettingPage() {
           </div>
         ) : null}
         <div className="overflow-auto p-5">
-          <table className="leak-rounded-header-table w-full min-w-[1050px] border-separate border-spacing-0 text-left text-sm">
+          <table className="leak-rounded-header-table w-full min-w-[1120px] border-separate border-spacing-0 text-left text-sm">
             <thead className="bg-transparent text-xs uppercase text-white">
               <tr>
-                <th className="rounded-l-lg bg-brand-500 px-4 py-3">Received</th>
+                <th className="rounded-l-lg bg-brand-500 px-4 py-3">ID</th>
+                <th className="bg-brand-500 px-4 py-3">Received</th>
                 <th className="bg-brand-500 px-4 py-3">Topic</th>
                 <th className="bg-brand-500 px-4 py-3">Error</th>
                 <th className="bg-brand-500 px-4 py-3">Status</th>
@@ -509,10 +515,11 @@ export default function SettingPage() {
               </tr>
             </thead>
             <tbody>
-              {loadingRejected && rejectedMessages.length === 0 ? <tr><td className="px-4 py-5 text-slate-500" colSpan={8}>Loading...</td></tr> : null}
-              {!loadingRejected && rejectedMessages.length === 0 ? <tr><td className="px-4 py-5 text-slate-500" colSpan={8}>No rejected MQTT messages.</td></tr> : null}
+              {loadingRejected && rejectedMessages.length === 0 ? <tr><td className="px-4 py-5 text-slate-500" colSpan={9}>Loading...</td></tr> : null}
+              {!loadingRejected && rejectedMessages.length === 0 ? <tr><td className="px-4 py-5 text-slate-500" colSpan={9}>No rejected MQTT messages.</td></tr> : null}
               {rejectedMessages.map((row) => (
                 <tr key={row.id}>
+                  <td className="border-b border-slate-100 px-4 py-3 font-mono text-slate-700 dark:border-slate-800 dark:text-slate-300">{row.id}</td>
                   <td className="border-b border-slate-100 px-4 py-3 text-slate-700 dark:border-slate-800 dark:text-slate-300">{new Date(row.received_at).toLocaleString()}</td>
                   <td className="max-w-xs border-b border-slate-100 px-4 py-3 font-semibold text-slate-800 dark:border-slate-800 dark:text-slate-200">{row.topic}</td>
                   <td className="max-w-md border-b border-slate-100 px-4 py-3 text-rose-700 dark:border-slate-800 dark:text-rose-300">{row.error_message}</td>

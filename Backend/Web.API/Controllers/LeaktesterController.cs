@@ -667,6 +667,7 @@ public class LeaktesterController : ApiControllerBase
             var client = new MqttFactory().CreateMqttClient();
             var publishedIds = new List<long>();
             var failedIds = new List<long>();
+            var failureReasons = new List<(long Id, string Error)>();
             try
             {
                 await client.ConnectAsync(optionsBuilder.Build(), HttpContext.RequestAborted);
@@ -679,6 +680,7 @@ public class LeaktesterController : ApiControllerBase
                         if (item is null || string.IsNullOrWhiteSpace(draft.Payload))
                         {
                             failedIds.Add(draft.Id);
+                            failureReasons.Add((draft.Id, item is null ? "Rejected message was not found." : "Payload is empty."));
                             continue;
                         }
 
@@ -699,11 +701,12 @@ public class LeaktesterController : ApiControllerBase
                         await client.PublishAsync(message, HttpContext.RequestAborted);
                         publishedIds.Add(item.Id);
                     }
-                    catch
+                    catch (Exception ex)
                     {
                         if (item is not null)
                         {
                             item.Status = "Pending";
+                            item.ErrorMessage = $"Reprocess publish failed: {ex.Message}";
                             try
                             {
                                 await _db.SaveChangesAsync(HttpContext.RequestAborted);
@@ -714,6 +717,7 @@ public class LeaktesterController : ApiControllerBase
                             }
                         }
                         failedIds.Add(draft.Id);
+                        failureReasons.Add((draft.Id, ex.Message));
                     }
                 }
             }
@@ -722,7 +726,12 @@ public class LeaktesterController : ApiControllerBase
                 client.Dispose();
             }
 
-            return ApiOk(new { published_ids = publishedIds, failed_ids = failedIds }, "Rejected MQTT payloads sent to the worker.");
+            return ApiOk(new
+            {
+                published_ids = publishedIds,
+                failed_ids = failedIds,
+                failure_reasons = failureReasons.Select(x => new { id = x.Id, error = x.Error })
+            }, "Rejected MQTT payloads sent to the worker.");
         }
         catch (Exception ex)
         {
