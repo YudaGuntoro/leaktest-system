@@ -668,11 +668,34 @@ public class LeaktesterController : ApiControllerBase
             var publishedIds = new List<long>();
             var failedIds = new List<long>();
             var skippedIds = new List<long>();
+            var deduplicatedIds = new List<long>();
             var failureReasons = new List<(long Id, string Error)>();
             try
             {
+                var distinctDrafts = request.Items.DistinctBy(x => x.Id).ToList();
+                var requestedIds = distinctDrafts.Select(x => x.Id).ToList();
+                var requestedRows = await _db.RejectedMqttMessages
+                    .Where(x => requestedIds.Contains(x.Id))
+                    .ToListAsync(HttpContext.RequestAborted);
+                var rowsById = requestedRows.ToDictionary(x => x.Id);
+                var duplicateDraftIds = distinctDrafts
+                    .Where(draft => rowsById.TryGetValue(draft.Id, out var row)
+                        && string.Equals(row.Status, "Pending", StringComparison.OrdinalIgnoreCase)
+                        && !string.IsNullOrWhiteSpace(draft.Payload))
+                    .Select(draft => new { Draft = draft, Row = rowsById[draft.Id] })
+                    .GroupBy(x => (x.Row.Topic, x.Draft.Payload))
+                    .SelectMany(group => group.OrderBy(x => x.Row.Id).Skip(1).Select(x => x.Row.Id))
+                    .ToList();
+                if (duplicateDraftIds.Count > 0)
+                {
+                    var duplicateRows = requestedRows.Where(x => duplicateDraftIds.Contains(x.Id)).ToList();
+                    _db.RejectedMqttMessages.RemoveRange(duplicateRows);
+                    await _db.SaveChangesAsync(HttpContext.RequestAborted);
+                    deduplicatedIds.AddRange(duplicateDraftIds);
+                }
+
                 await client.ConnectAsync(optionsBuilder.Build(), HttpContext.RequestAborted);
-                foreach (var draft in request.Items.DistinctBy(x => x.Id))
+                foreach (var draft in distinctDrafts.Where(x => !duplicateDraftIds.Contains(x.Id)))
                 {
                     RejectedMqttMessage? item = null;
                     try
@@ -745,6 +768,7 @@ public class LeaktesterController : ApiControllerBase
                 published_ids = publishedIds,
                 failed_ids = failedIds,
                 skipped_ids = skippedIds,
+                deduplicated_ids = deduplicatedIds,
                 failure_reasons = failureReasons.Select(x => new { id = x.Id, error = x.Error })
             }, "Rejected MQTT payloads sent to the worker.");
         }

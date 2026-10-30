@@ -130,6 +130,7 @@ export default function SettingPage() {
         published_ids: number[];
         failed_ids: number[];
         skipped_ids: number[];
+        deduplicated_ids: number[];
         failure_reasons: { id: number; error: string }[];
       }>("/api/leaktester/rejected-mqtt-messages/reprocess-all", {
         method: "POST",
@@ -138,7 +139,7 @@ export default function SettingPage() {
       const failureIds = result.failed_ids.join(", ");
       setMessage({
         kind: result.failed_ids.length === 0 ? "ok" : "error",
-        text: `${result.published_ids.length} payload terkirim ke MQTT; ${result.failed_ids.length} gagal dikirim; ${result.skipped_ids.length} dilewati karena sudah Published.${failureIds ? ` ID gagal: ${failureIds}.` : ""} Alasan gagal ditampilkan pada kolom Error.`,
+        text: `${result.published_ids.length} payload terkirim ke MQTT; ${result.failed_ids.length} gagal dikirim; ${result.deduplicated_ids.length} duplikat identik digabung menjadi satu; ${result.skipped_ids.length} dilewati karena sudah Published.${failureIds ? ` ID gagal: ${failureIds}.` : ""} Alasan gagal ditampilkan pada kolom Error.`,
       });
       window.setTimeout(() => void loadRejectedMessages(), 1000);
     } catch (err) {

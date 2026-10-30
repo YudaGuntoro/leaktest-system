@@ -3,6 +3,8 @@ using LeakTestWorker.Domains.Models;
 using LeakTestWorker.Helper;
 using LeakTestWorker.Singletone;
 using MySql.Data.MySqlClient;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace LeakTestWorker.MQTT.Handlers.SQL;
 
@@ -101,10 +103,39 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
         await EnsureReworkEngineTableAsync(connection, cancellationToken);
         await EnsureColumnAsync(connection, "rejected_mqtt_message_id", "ALTER TABLE leak_test_work_records ADD COLUMN rejected_mqtt_message_id BIGINT NULL AFTER source_payload", cancellationToken);
         await EnsureIndexAsync(connection, "ux_leak_test_work_records_rejected_mqtt_message_id", "CREATE UNIQUE INDEX ux_leak_test_work_records_rejected_mqtt_message_id ON leak_test_work_records (rejected_mqtt_message_id)", cancellationToken);
+        await EnsureColumnAsync(connection, "source_payload_hash", "ALTER TABLE leak_test_work_records ADD COLUMN source_payload_hash CHAR(64) NULL AFTER rejected_mqtt_message_id", cancellationToken);
+        await EnsureIndexAsync(connection, "ix_leak_test_work_records_source_payload_hash", "CREATE INDEX ix_leak_test_work_records_source_payload_hash ON leak_test_work_records (source_payload_hash)", cancellationToken);
+        var unhashedPayloadCount = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            "SELECT COUNT(*) FROM leak_test_work_records WHERE source_payload_hash IS NULL AND source_payload IS NOT NULL;",
+            cancellationToken: cancellationToken));
+        if (unhashedPayloadCount > 0)
+        {
+            await connection.ExecuteAsync(new CommandDefinition(
+                "UPDATE leak_test_work_records SET source_payload_hash = SHA2(source_payload, 256) WHERE source_payload_hash IS NULL AND source_payload IS NOT NULL;",
+                cancellationToken: cancellationToken));
+        }
+
+        var sourcePayloadHash = string.IsNullOrEmpty(record.RawPayload)
+            ? null
+            : Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(record.RawPayload)));
 
         using var transaction = connection.BeginTransaction();
         try
         {
+            if (sourcePayloadHash is not null)
+            {
+                var existingPayloadId = await connection.ExecuteScalarAsync<long?>(new CommandDefinition(
+                    "SELECT id FROM leak_test_work_records WHERE source_payload_hash = @hash LIMIT 1 FOR UPDATE;",
+                    new { hash = sourcePayloadHash },
+                    transaction,
+                    cancellationToken: cancellationToken));
+                if (existingPayloadId.HasValue)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                    return existingPayloadId.Value;
+                }
+            }
+
             if (record.RejectedMqttMessageId.HasValue)
             {
                 var existingId = await connection.ExecuteScalarAsync<long?>(new CommandDefinition(
@@ -125,9 +156,9 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
             await connection.ExecuteAsync(new CommandDefinition(
                 """
                 INSERT INTO leak_test_work_records
-                    (engine_model_id, engine_number, barcode_scan, check_date, check_time, machine_name, operator_name, parameter_pressure, channel_no, press_set_up, press_set_low, pressure_input, cycle_time_leak_test_minutes, judgement_code, source_payload, rejected_mqtt_message_id, created_at, updated_at)
+                    (engine_model_id, engine_number, barcode_scan, check_date, check_time, machine_name, operator_name, parameter_pressure, channel_no, press_set_up, press_set_low, pressure_input, cycle_time_leak_test_minutes, judgement_code, source_payload, rejected_mqtt_message_id, source_payload_hash, created_at, updated_at)
                 VALUES
-                    (@engine_model_id, @engine_number, @barcode_scan, @check_date, @check_time, @machine_name, @operator_name, @parameter_pressure, @channel_no, @press_set_up, @press_set_low, @pressure_input, @cycle_time, @judgement_code, @source_payload, @rejected_mqtt_message_id, NOW(), NOW());
+                    (@engine_model_id, @engine_number, @barcode_scan, @check_date, @check_time, @machine_name, @operator_name, @parameter_pressure, @channel_no, @press_set_up, @press_set_low, @pressure_input, @cycle_time, @judgement_code, @source_payload, @rejected_mqtt_message_id, @source_payload_hash, NOW(), NOW());
                 """,
                 new
                 {
@@ -146,7 +177,8 @@ public sealed class LeakTestHistoryInsertService : ILeakTestHistoryInsertService
                     cycle_time = record.CycleTimeLeakTestMinutes,
                     judgement_code = record.JudgementCode,
                     source_payload = record.RawPayload,
-                    rejected_mqtt_message_id = record.RejectedMqttMessageId
+                    rejected_mqtt_message_id = record.RejectedMqttMessageId,
+                    source_payload_hash = sourcePayloadHash
                 },
                 transaction,
                 cancellationToken: cancellationToken));
