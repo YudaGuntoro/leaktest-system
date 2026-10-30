@@ -667,6 +667,7 @@ public class LeaktesterController : ApiControllerBase
             var client = new MqttFactory().CreateMqttClient();
             var publishedIds = new List<long>();
             var failedIds = new List<long>();
+            var skippedIds = new List<long>();
             var failureReasons = new List<(long Id, string Error)>();
             try
             {
@@ -677,10 +678,23 @@ public class LeaktesterController : ApiControllerBase
                     try
                     {
                         item = await _db.RejectedMqttMessages.FirstOrDefaultAsync(x => x.Id == draft.Id);
-                        if (item is null || string.IsNullOrWhiteSpace(draft.Payload))
+                        if (item is null)
                         {
                             failedIds.Add(draft.Id);
-                            failureReasons.Add((draft.Id, item is null ? "Rejected message was not found." : "Payload is empty."));
+                            failureReasons.Add((draft.Id, "Rejected message was not found."));
+                            continue;
+                        }
+
+                        if (!string.Equals(item.Status, "Pending", StringComparison.OrdinalIgnoreCase))
+                        {
+                            skippedIds.Add(draft.Id);
+                            continue;
+                        }
+
+                        if (string.IsNullOrWhiteSpace(draft.Payload))
+                        {
+                            failedIds.Add(draft.Id);
+                            failureReasons.Add((draft.Id, "Payload is empty."));
                             continue;
                         }
 
@@ -730,6 +744,7 @@ public class LeaktesterController : ApiControllerBase
             {
                 published_ids = publishedIds,
                 failed_ids = failedIds,
+                skipped_ids = skippedIds,
                 failure_reasons = failureReasons.Select(x => new { id = x.Id, error = x.Error })
             }, "Rejected MQTT payloads sent to the worker.");
         }
